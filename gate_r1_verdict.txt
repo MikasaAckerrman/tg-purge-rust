@@ -1,0 +1,30 @@
+run_id=45624508170
+
+JOB host: completed / failure  (started 2026-11-25T13:31:47Z)
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 юнит-тесты (без сети)
+   OK   5 список возможностей, доказанных компилятором
+   FAIL  6 размер бинаря
+   OK  12 Post Run actions/checkout@v4
+   OK  13 Complete job
+
+JOB android: completed / failure  (started 2026-11-25T13:31:48Z)
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   FAIL  4 показать версию cargo
+   skip  5 установить NDK
+   skip  6 NDK r27
+   skip  7 cargo-ndk
+   skip  8 сборка под Android (cdylib + bin)
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK  20 Post Run actions/checkout@v4
+   OK  21 Complete job
+
+=== сырой лог упавшего шага (первые 60 строк) ===
+logs code=200 size=27204
+не zip (скорее всего 404: минуты private или нет прав на логи)
+VERDICT_DONE

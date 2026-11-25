@@ -16,7 +16,7 @@ fn main() {
         return;
     }
     // Без аргументов — только проверка, что типы сходятся (сети нет).
-    let _ = caps::pool_typechecks(0);
+    caps::pool_typechecks(0);
     println!("purge spike: компиляция типов прошла; запускай с --caps для списка возможностей");
 }
 

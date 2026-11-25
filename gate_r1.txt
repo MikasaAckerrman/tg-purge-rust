@@ -2,3 +2,10 @@
 
 === 1) создание репозитория ===
 repo: MikasaAckerrman/tg-purge-rust | private: False | err: 
+=== 2) push ===
+push exit=0
+HEAD=3c9e2fc
+=== 3) запуски CI ===
+total 1 
+  id=45624508170 rust | in_progress | None | sha 3c9e2fc
+DONE
