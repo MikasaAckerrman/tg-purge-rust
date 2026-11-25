@@ -273,6 +273,38 @@ def blanks(src: str) -> str:
     return res
 
 
+import re
+
+
+def fmt_lines(code: str):
+    """Строки (номер, текст) ВНУТРИ вызовов формат-макросов, включая стартовую.
+
+    Нужно, потому что println! у меня часто занимает несколько строк, и проверка
+    «println! на той же строке» не ловит собственные баги (раунд 14).
+    Скобочный баланс считается по коду, уже очищенному от строк и комментариев.
+    """
+    MACRO = re.compile(r"\b(?:println|print|format|eprintln|write|writeln)!?\s*\(")
+    out = []
+    depth = 0
+    base = None
+    for idx, line in enumerate(code.splitlines(), 1):
+        inside = base is not None and depth > base
+        if MACRO.search(line):
+            inside = True
+            if base is None:
+                base = depth
+        if inside:
+            out.append((idx, line))
+        for ch in line:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+        if base is not None and depth <= base:
+            base = None
+    return out
+
+
 def line_of(src: str, idx: int) -> int:
     return src.count("\n", 0, idx) + 1
 

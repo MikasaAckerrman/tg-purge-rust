@@ -243,6 +243,18 @@ APK tg.purge (Kotlin, ~200 строк, только оболочка)
 * ★ **Провал гейта R3 (единственный, подтверждён дважды):** `channels.editDescription`
   в слое 233 ОТСУТСТВУЕТ (grep по имени → 0, по ID `f8b0a74e` → 0). Описание супергруппы:
   git-master (layer 234, коммит 24.11.2026) / TDLib JSON / остаётся на Python-движке.
+* ★ **ГЕЙТ R1 ПРОЙДЕН** (раунд 13, run 45673919282): host success + android success,
+  артефакт `libpurge.so` = ELF aarch64 «for Android 24, built by NDK r27», 307216 Б,
+  бинарь `purge` 498592 Б. Раунд 14: android снова зелёный (39.33 с сборка), host упал
+  на шаге 6 (юнит-тесты в dev-профиле) — и отчёт не сохранился, потому что шаги после
+  падения пропускаются ⇒ нужен `if: always()` на сборе диагностики.
+* ★ `nm -D --defined-only libpurge.so` → **символов T: 0** (раунд 14). Причина:
+  `[profile.release] strip = true` и нет ни одного `#[no_mangle] pub extern "C"`.
+  Следствие для Ф-R6: либо Kotlin JNI-мост обязан звать только явно экспортированные
+  `#[no_mangle] extern "C" fn` (и тогда `strip` для cdylib надо отключить/оставить
+  символы), либо APK запускает бинарь `purge` как процесс (путь Termux). Выбор —
+  часть Ф-R6, но проверка «что реально экспортируется» обязана быть в CI-отчёте
+  всегда, иначе это всплывёт только на устройстве, которое я не могу прошить сам.
 * Именование TL (rustifier.rs:92-122 + enums.rs:73-77): префикс типа режется только при
   `starts_with`; иначе вариант = ПОЛНОЕ имя (`inputChatUploadedPhoto` →
   `InputChatPhoto::InputChatUploadedPhoto`, НЕ `Uploaded`); `inputPeerSelf` → `PeerSelf`;

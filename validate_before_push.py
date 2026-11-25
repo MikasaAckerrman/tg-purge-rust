@@ -146,6 +146,17 @@ else:
                         if sender and sink:
                             print(f"YAML ПЛОХО: сломанный канал: {line.strip()[:80]}")
                             ok = False
+        # раунд 14: шаг сбора диагностики БЕЗ `if: always()` пропускается после
+        # падения предыдущего ⇒ test.log не сохранился и раунд 15 чинился бы вслепую.
+        # ★ Проверка обязана быть на УРОВНЕ ШАГА: первая версия легла внутрь
+        #   `if run and "pipefail" in run`, и у шагов без `run:` (upload-artifact)
+        #   она не выполнялась вовсе — красный тест проходил молча.
+        name = s.get("name") or ""
+        if "сохранить отчёт" in name or "логи" in name:
+            if s.get("if") != "always()":
+                print(f"YAML ПЛОХО: шаг {name!r} собирает диагностику без if: always() "
+                      f"— при провале он пропустится")
+                ok = False
     print("YAML OK: jobs =", list(jobs.keys()))
 
 # ---- чистая логика: локальный прогон тестов БЕЗ CI (главная экономия раунда 13) ----
@@ -218,6 +229,15 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if re.search(r"user\.id\(\)", code) and "bare_id_unchecked" not in code:
         print(f"src/{f}: User::id() -> PeerId, а не i64 — нужен bare_id_unchecked()")
         ok = False
+    # раунд 14: User::first_name()/last_name()/username() -> Option<&str> (peer/user.rs:128,133,161).
+    # В печати у Option НЕТ Display ⇒ не компилируется. Проверка обязана ловить и
+    # многострочные println!: в раунде 14 наивная «println! в той же строке» НЕ поймала
+    # мой собственный баг, потому что вызов был на отдельной строке внутри println!.
+    for idx, line in braces2.fmt_lines(code):
+        for m in ("first_name()", "last_name()", "username()"):
+            if m in line and "unwrap" not in line and ":?" not in line and "match" not in line:
+                print(f"src/{f}:{idx}: {m} -> Option<&str>, в печати нужен unwrap_or (или {{:?}}): {line.strip()[:90]}")
+                ok = False
     if re.search(r"\bSenderHandle\b", code):
         print(f"src/{f}: SenderHandle не существует — в 0.12.0 SenderPoolHandle/SenderPoolFatHandle")
         ok = False

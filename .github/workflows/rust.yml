@@ -82,11 +82,13 @@ jobs:
           ls -la target/release/purge target/release/libpurge.so | tee sizes.txt
           du -sh target/release/libpurge.so
 
-      # ★ Отчёт загружается ВСЕГДА, а не только на провал (раунд 13): гейт R1 стал
-      #   зелёным, и таблица `--caps` — единственный результат раунда — осталась
-      #   недоступной: логи job требуют scope actions:run, которого у PAT нет (404).
-      #   Без неё я вижу «успех», но не вижу, ЧТО именно компилятор доказал.
+      # ★ Отчёт загружается ВСЕГДА и ПРИ ПРОВАЛЕ (раунд 14): шаги по умолчанию
+      #   пропускаются после предыдущего падения (`if: success()`), поэтому при
+      #   упавших тестах артефакт со step 6 НЕ сохранился, и я остался без
+      #   test.log — то есть чинил бы раунд 15 вслепую. `if: always()` обязателен
+      #   для любого шага, который собирает диагностику.
       - name: "сохранить отчёт"
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: host-report
@@ -97,7 +99,7 @@ jobs:
             session_format.txt
             sizes.txt
             tree.txt
-          if-no-files-found: error
+          if-no-files-found: warn
 
   android:
     runs-on: ubuntu-latest
@@ -215,6 +217,7 @@ jobs:
           if-no-files-found: error
 
       - name: "сохранить отчёт android"
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-report
@@ -226,4 +229,4 @@ jobs:
             bins.txt
             ndkinst.log
             ndkver.txt
-          if-no-files-found: ignore
+          if-no-files-found: warn
