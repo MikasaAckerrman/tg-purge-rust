@@ -1,0 +1,10 @@
+=== 1) обязательные проверки ===
+ok: самопроверка: 15 из 15 прошли
+ok: скобки сбалансированы
+ok красный: YAML ПЛОХО: сломанный канал: cargo tree --depth 1 2>&1 | head -20
+ok зелёный:
+CARGO OK: симметрия (7 объявлено, алиасов: 1, собственные имена: ['purge'])
+YAML OK: jobs = ['host', 'android']
+PURE OK: src/rate.rs — test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+PURE OK: src/util.rs — test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+=== 2) push ===

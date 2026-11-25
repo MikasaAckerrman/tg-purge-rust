@@ -28,7 +28,7 @@
 
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -37,6 +37,7 @@ use grammers_client::{Client, SignInError};
 use grammers_mtsender::{SenderPool, SenderPoolFatHandle};
 
 use crate::store::FileSession;
+use crate::util::{read_code, CodeError};
 
 /// Результат авторизации — только то, что юзер просил показать: id и имя.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,42 +79,22 @@ impl std::fmt::Display for AuthError {
 
 impl std::error::Error for AuthError {}
 
-/// Разбор кода из файла-канала: только цифры, длина 4–7, без мусора.
-///
-/// Почему строго: лишний/неверный код — это не «попробуем ещё раз», а расход
-/// кодов и риск flood-wait (ошибка №2 протокола: два send-скрипта пролетели зря).
-pub fn parse_code(raw: &str) -> Result<String, AuthError> {
-    let s: String = raw.trim().chars().filter(|c| !c.is_whitespace()).collect();
-    if s.is_empty() {
-        return Err(AuthError::BadCode("пусто".into()));
-    }
-    if !s.chars().all(|c| c.is_ascii_digit()) {
-        return Err(AuthError::BadCode(s));
-    }
-    if !(4..=7).contains(&s.len()) {
-        return Err(AuthError::BadCode(s));
-    }
-    Ok(s)
-}
-
-/// Прочитать код, если он уже лежит. Ничего не ждём и не создаём.
-pub fn read_code(path: &Path) -> Option<String> {
-    let raw = std::fs::read_to_string(path).ok()?;
-    match parse_code(&raw) {
-        Ok(code) => Some(code),
-        Err(_) => None,
+/// Разбор/чтение/обнуление файла-канала кода переехали в `crate::util` — std-only
+/// модуль, который гоняется ЛОКАЛЬНО (rustc 1.83 может), потому что расход кода
+/// дорог: окно 15 минут и flood-wait на повторный SendCode.
+impl From<CodeError> for AuthError {
+    fn from(e: CodeError) -> Self {
+        match e {
+            CodeError::Empty | CodeError::NotDigits(_) | CodeError::WrongLen(_) => {
+                AuthError::BadCode(e.to_string())
+            }
+            CodeError::Fs(_) => AuthError::Store(e.to_string()),
+        }
     }
 }
 
-/// Путь файла-канала кода: обнуляем, чтобы следующий прогон не прочитал ПРОШЛЫЙ код
-/// (иначе мгновенный PHONE_CODE_EXPIRED — ошибка №5 протокола).
-pub fn prepare_code_channel(path: &Path) -> Result<PathBuf, AuthError> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| AuthError::Store(format!("mkdir: {e}")))?;
-    }
-    std::fs::write(path, "").map_err(|e| AuthError::Store(format!("truncate code file: {e}")))?;
-    Ok(path.to_path_buf())
-}
+// `prepare_code_channel` живёт в `crate::util` (std-only, локальные тесты).
+// Держать её здесь — второй источник правды плюс ссылка на удалённый PathBuf.
 
 pub struct AuthRunner {
     pub client: Client,
@@ -267,49 +248,8 @@ fn log_line(msg: &str) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parse_code_accepts_digits_only() {
-        assert_eq!(parse_code("  12345\n").unwrap(), "12345");
-        assert_eq!(parse_code("1234").unwrap(), "1234");
-        assert_eq!(parse_code("1234567").unwrap(), "1234567");
-    }
-
-    #[test]
-    fn parse_code_rejects_garbage() {
-        // Пусто, не цифры, неподходящая длина — отказ, а не «попробуем как-нибудь»
-        assert!(parse_code("").is_err());
-        assert!(parse_code("   ").is_err());
-        assert!(parse_code("12a45").is_err());
-        assert!(parse_code("123").is_err());
-        assert!(parse_code("12345678").is_err());
-        assert!(parse_code("+79962227579").is_err());
-    }
-
-    #[test]
-    fn read_code_returns_none_without_file() {
-        let p = std::env::temp_dir().join("purge_auth_test_absent_code.txt");
-        let _ = std::fs::remove_file(&p);
-        assert!(read_code(&p).is_none());
-    }
-
-    #[test]
-    fn prepare_channel_empties_stale_code() {
-        // Иначе следующий прогон мгновенно прочитает ПРОШЛЫЙ код и получит EXPIRED.
-        let p = std::env::temp_dir().join("purge_auth_test_stale_code.txt");
-        std::fs::write(&p, "11111").unwrap();
-        prepare_code_channel(&p).unwrap();
-        assert_eq!(std::fs::read_to_string(&p).unwrap(), "");
-        assert!(read_code(&p).is_none());
-        let _ = std::fs::remove_file(&p);
-    }
-
-    #[test]
-    fn read_code_accepts_written_code() {
-        let p = std::env::temp_dir().join("purge_auth_test_ok_code.txt");
-        std::fs::write(&p, "42424\n").unwrap();
-        assert_eq!(read_code(&p).as_deref(), Some("42424"));
-        let _ = std::fs::remove_file(&p);
-    }
+    // Pure-тесты разбора кода переехали в `crate::util` (std-only) и гонятся ЛОКАЛЬНО.
+    // Здесь остаются только проверки, которым нужен grammers-тип AuthError.
 
     #[test]
     fn auth_error_messages_have_no_secrets() {
@@ -321,6 +261,18 @@ mod tests {
         assert!(m.contains("TG_2FA_PASSWORD"));
         let d = AuthError::Denied("SignIn: PHONE_CODE_EXPIRED".into()).to_string();
         assert!(d.contains("PHONE_CODE_EXPIRED"));
+    }
+
+    #[test]
+    fn code_error_maps_to_right_class() {
+        // Ошибка ФС НЕ должна выглядеть как отказ Telegram: это разные решения
+        // («починить диск/права» против «не слать повторный SendCode»).
+        let bad: AuthError = CodeError::WrongLen("123".into()).into();
+        assert!(matches!(bad, AuthError::BadCode(_)), "не тот класс: {bad}");
+        let empty: AuthError = CodeError::Empty.into();
+        assert!(matches!(empty, AuthError::BadCode(_)));
+        let fs: AuthError = CodeError::Fs("nope".into()).into();
+        assert!(matches!(fs, AuthError::Store(_)), "ошибка ФС попала в Telegram-класс: {fs}");
     }
 
     #[test]

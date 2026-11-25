@@ -72,25 +72,32 @@ jobs:
       - name: "список возможностей, доказанных компилятором"
         run: |
           set -o pipefail
-          ./target/release/purge --caps
-          ./target/release/purge --session-format
+          ./target/release/purge --caps | tee caps.txt
+          ./target/release/purge --session-format > session_format.txt
+          cat session_format.txt
 
       - name: "размер артефактов"
         run: |
           set -o pipefail
-          ls -la target/release/purge target/release/libpurge.so
+          ls -la target/release/purge target/release/libpurge.so | tee sizes.txt
           du -sh target/release/libpurge.so
 
-      - name: "сохранить логи на провал"
-        if: failure()
+      # ★ Отчёт загружается ВСЕГДА, а не только на провал (раунд 13): гейт R1 стал
+      #   зелёным, и таблица `--caps` — единственный результат раунда — осталась
+      #   недоступной: логи job требуют scope actions:run, которого у PAT нет (404).
+      #   Без неё я вижу «успех», но не вижу, ЧТО именно компилятор доказал.
+      - name: "сохранить отчёт"
         uses: actions/upload-artifact@v4
         with:
-          name: host-logs
+          name: host-report
           path: |
             build.log
             test.log
+            caps.txt
+            session_format.txt
+            sizes.txt
             tree.txt
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   android:
     runs-on: ubuntu-latest
@@ -194,9 +201,9 @@ jobs:
         run: |
           set -o pipefail
           ls -la target/aarch64-linux-android/release/libpurge.so target/aarch64-linux-android/release/purge
-          file target/aarch64-linux-android/release/libpurge.so
+          file target/aarch64-linux-android/release/libpurge.so | tee android_file.txt
           nm -D --defined-only target/aarch64-linux-android/release/libpurge.so > symbols.txt 2>&1 || true
-          echo "символов T: $(grep -c ' T ' symbols.txt || true)"
+          echo "символов T: $(grep -c ' T ' symbols.txt || true)" | tee -a android_file.txt
           sed -n '1,12p' symbols.txt
 
       - uses: actions/upload-artifact@v4
@@ -207,14 +214,16 @@ jobs:
             target/aarch64-linux-android/release/purge
           if-no-files-found: error
 
-      - name: "сохранить логи на провал"
-        if: failure()
+      - name: "сохранить отчёт android"
         uses: actions/upload-artifact@v4
         with:
-          name: android-logs
+          name: android-report
           path: |
             android.log
+            android_file.txt
+            symbols.txt
             ndk.log
             bins.txt
             ndkinst.log
+            ndkver.txt
           if-no-files-found: ignore

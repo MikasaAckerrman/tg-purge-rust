@@ -16,6 +16,7 @@ pub mod caps;
 pub mod engine;
 pub mod rate;
 pub mod store;
+pub mod util;
 
 pub use store::{FileSession, FORMAT_VERSION, StoreError};
 
