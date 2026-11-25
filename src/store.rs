@@ -14,16 +14,16 @@
 //! (у grammers-client собственного serde-passthrough нет: его features —
 //! default=["fs"], html, markdown, parse_invite_link, proxy).
 //!
-//! Формы типов — ИЗ ИСХОДНИКОВ vendor/grammers-session-0.12.0/src, не из догадок:
-//!   types.rs   DcOption { id: i32, ipv4: SocketAddrV4, ipv6: SocketAddrV6,
-//!                          auth_key: Option<[u8;256]>  (serde_as Hex) }
-//!   types.rs   UpdatesState { pts, qts, date, seq: i32, channels: Vec<ChannelState> }
-//!             ChannelState { id: i64, pts: i32 }
-//!             UpdateState = All(UpdatesState) | Primary{pts,date,seq}
-//!                         | Secondary{qts} | Channel{id,pts}
-//!   peer.rs    PeerInfo = User{id:i64, auth:Option<PeerAuth>, bot:Option<bool>,
-//!                            is_self:Option<bool>} | Chat{id:i64} | Channel{…}
-//!             PeerInfo::id() -> PeerId  (PeerId::user_unchecked/chat_unchecked/…)
+//! Формы типов — ИЗ ИСХОДНИКОВ vendor/grammers-session-0.12.0/src (не из догадок):
+//!   types.rs:22   DcOption { id: i32, ipv4, ipv6, auth_key: Option<[u8;256]> }
+//!                 (serde_as, hex)
+//!   types.rs:50   UpdatesState { pts, qts, date, seq: i32, channels: Vec<ChannelState> }
+//!   types.rs:66   ChannelState { id: i64, pts: i32 }
+//!   types.rs:75   UpdateState = All(UpdatesState) | Primary{pts,date,seq}
+//!                          | Secondary{qts} | Channel{id,pts}     ← ровно 4 ветки
+//!   peer.rs       PeerId::{user_unchecked(i64), bare_id_unchecked(self) -> i64}
+//!                 PeerInfo::id(&self) -> PeerId
+//!   session.rs    trait Session { type Error: Send; … 9 методов }
 //!
 //! Ключи HashMap: `PeerId` — newtype над i64 с приватным полем; как ключ JSON-карты
 //! он сломал бы serde («key must be a string»). Поэтому на диск уходит Vec<PeerInfo>,
@@ -41,7 +41,8 @@ use grammers_session::{BoxFuture, Session, SessionData};
 use serde::{Deserialize, Serialize};
 
 /// Ошибка хранилища. Требуемый трейтом `Session::Error` обязан быть `Send`,
-/// поэтому вложенных типов нет — только текст.
+/// а `SenderPool::new` дополнительно требует `std::error::Error + Send + Sync + 'static`
+/// (проверено: sender_pool.rs:250-256) — поэтому только текст, без вложенных типов.
 #[derive(Debug)]
 pub enum StoreError {
     /// Мьютекс отравлен (паника внутри критической секции).
@@ -129,7 +130,7 @@ impl FileSession {
         })
     }
 
-    /// Запись атомарно: tmp + rename. Оборванная запись без rename убила бы сессию
+    /// Записать атомарно: tmp + rename. Оборванная запись без rename убила бы сессию
     /// и заставила логиниться заново — то есть поймала бы ровно тот flood-wait,
     /// ради которого всё это и пишется.
     pub fn flush(&self) -> Result<(), StoreError> {
@@ -198,9 +199,9 @@ impl Session for FileSession {
         Box::pin(async move { Ok(self.lock()?.updates_state.clone()) })
     }
 
-    /// Ровно 4 ветки `UpdateState` из types.rs 0.12.0 (All/Primary/Secondary/Channel).
-    /// `_ =>` здесь НЕ добавляем: если layer сменится и появятся новая ветка,
-    /// компилятор обязан это поймать, а не проглотить.
+    /// Ровно 4 ветки `UpdateState` из types.rs 0.12.0 (All/Primary/Secondary/Channel),
+    /// перечислены ЯВНО. `_ =>` здесь НЕ добавляем: если layer сменится и появится
+    /// пятая ветка, компилятор обязан это поймать, а не проглотить.
     fn set_update_state(&self, update: UpdateState) -> BoxFuture<'_, Result<(), Self::Error>> {
         Box::pin(async move {
             let mut d = self.lock()?;
@@ -236,8 +237,8 @@ mod tests {
         p
     }
 
-    /// Бокс-футеры трейта `Session` выполняем простым current-thread executor'ом:
-    /// они не делают реальных await, но poll вручную с noop-waker — это хрупкая
+    /// Бокс-футеры трейта `Session` выполняем current-thread executor'ом:
+    /// они не делают реальных await, но poll вручную с noop-waker — хрупкая
     /// самоделка, а tokio уже в зависимостях.
     fn block<F: std::future::Future>(f: F) -> F::Output {
         tokio::runtime::Builder::new_current_thread()
@@ -266,7 +267,7 @@ mod tests {
             block(s.set_home_dc_id(2)).unwrap();
             block(s.cache_peer(PeerInfo::User {
                 id: 5804685716,
-                auth: None,
+                auth: grammers_session::types::PeerAuth::from_hash(12345678901234),
                 bot: Some(false),
                 is_self: Some(true),
             }))
@@ -332,7 +333,7 @@ mod tests {
         // Молча заменить испорченную сессию дефолтом = потерять вход и поймать
         // flood-wait на повторном логине. Поэтому ошибка, а не «ну и ладно».
         let path = tmp("e");
-        std::fs::write(&path, b"{ не json ").unwrap();
+        std::fs::write(&path, b"{ ne json ").unwrap();
         assert!(FileSession::open(&path).is_err());
     }
 
@@ -358,5 +359,15 @@ mod tests {
         let s2 = FileSession::open(&path).unwrap();
         let got = s2.dc_option(1).unwrap().expect("ДЦ 1 пропал");
         assert_eq!(got.auth_key, Some([9u8; 256]), "auth_key не восстановился");
+    }
+
+    #[test]
+    fn peer_id_roundtrip_via_bare_id() {
+        // User::id() отдаёт PeerId, а не i64 — движок обязан уметь получать
+        // «сырой» id для логов/аудита, не теряя тип.
+        let pid = PeerId::user_unchecked(5804685716);
+        assert_eq!(pid.bare_id_unchecked(), 5804685716);
+        let ch = PeerId::channel_unchecked(3845264517);
+        assert_eq!(ch.bare_id_unchecked(), 3845264517);
     }
 }

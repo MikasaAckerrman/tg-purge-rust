@@ -6,11 +6,14 @@
 ответа по grammers, потому что cargo до grammers не дошёл. Проверка локально
 стоит 1 секунду, проверка в CI — 3 минуты и один сгоревший раунд.
 """
+import os
 import re
 import sys
 import tomllib
 
 import yaml
+
+import braces2
 
 ROOT = "/var/minis/shared/rustspike"
 # Путь workflow можно переопределить: так проверяем, что валидатор КРАСНЕЕТ на
@@ -113,11 +116,9 @@ else:
 
 # ---- Rust-исходники: честный баланс скобок (строки/комментарии не в счёт) ----
 # Наивный `src.count('{')` давал ЛОЖНЫЕ срабатывания: в store.rs есть
-# `std::fs::write(&path, b"{ не json ")` и скобки в doc-комментариях.
-# Ложный линтер игнорируют, поэтому считаем только код (braces.py).
-import os
-from braces import check as brace_check
-
+# `std::fs::write(&path, b"{ ne json ")` и скобки в doc-комментариях.
+# Ложный линтер игнорируют, поэтому считаем только код (braces2.py), а сам
+# braces2 обязан проходить --selftest из 15 кейсов с известным ответом.
 for f in sorted(os.listdir(f"{ROOT}/src")):
     if not f.endswith(".rs"):
         continue
@@ -129,13 +130,30 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if "retry_policy::" in src:
         print(f"src/{f}: использует retry_policy — модуль не объявлен в 0.12.0")
         ok = False
-    if "_ => " in src and "set_update_state" in src:
-        for line in src.splitlines():
-            if line.strip().startswith("_ =>"):
-                print(f"src/{f}: `_ =>` в match — скроет новую ветку UpdateState вместо ошибки компиляции")
-                ok = False
-    if brace_check(p) != 0:
-        print(f"src/{f}: дисбаланс фигурных скобок в КОДЕ (не в строках)")
+    # ловим конкретные сигнатурные ошибки, на которых я уже падал (раунды 5–6).
+    # ВАЖНО: проверяем по коду БЕЗ строк и комментариев — иначе собственная
+    # doc-строка про «if let Ok(msg) = item» детектируется как реальный баг
+    # (ложное срабатывание, из-за которого валидатору перестают верить).
+    code = braces2.blanks(src)
+    if "get_me()" in code and ".await" not in code.split("get_me()")[1][:40]:
+        print(f"src/{f}: get_me() без .await — это async (chats.rs:414)")
+        ok = False
+    if re.search(r"user\.id\(\)", code) and "bare_id_unchecked" not in code:
+        print(f"src/{f}: User::id() -> PeerId, а не i64 — нужен bare_id_unchecked()")
+        ok = False
+    if re.search(r"\bSenderHandle\b", code):
+        print(f"src/{f}: SenderHandle не существует — в 0.12.0 SenderPoolHandle/SenderPoolFatHandle")
+        ok = False
+    if re.search(r"if let Ok\(msg\) = item", code):
+        print(f"src/{f}: итератор отдаёт Result<Option<T>,_>, а не Result<Result<T,_>,_> — "
+              f"такой паттерн тихо теряет все сообщения")
+        ok = False
+    if "_ =>" in code and "set_update_state" in code:
+        print(f"src/{f}: `_ =>` в match set_update_state — скроет новую ветку UpdateState "
+              f"вместо ошибки компиляции")
+        ok = False
+    if braces2.balance(p, verbose=False) != 0:
+        print(f"src/{f}: дисбаланс фигурных скобок в КОДЕ (не в строках/комментариях)")
         ok = False
     else:
         print(f"src/{f}: {len(src)} байт, скобки в коде сбалансированы")

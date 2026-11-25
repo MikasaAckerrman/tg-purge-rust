@@ -11,6 +11,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod auth;
 pub mod caps;
 pub mod store;
 

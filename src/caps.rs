@@ -5,17 +5,29 @@
 //! это ответ гейта, полученный за 2 минуты CI, а не после дня написания движка.
 //!
 //! Все формы вызовов взяты ИЗ ИСХОДНИКОВ grammers 0.12.0 (скачаны в vendor/,
-//! лежат в репозитории только для чтения — в git не попадают):
-//!   client/auth.rs        is_authorized / request_login_code / sign_in / check_password
-//!   client/messages.rs    delete_messages<C: Into<PeerRef>>(&self, peer: C, &[i32]) -> Result<usize, InvocationError>
-//!   client/messages.rs    iter_messages<C: Into<PeerRef>>(&self, peer: C) -> MessageIter
-//!   client/chats.rs       iter_participants / get_permissions / iter_profile_photos / resolve_username
-//!   client/dialogs.rs     iter_dialogs() -> DialogIter
-//!   client/net.rs:91      invoke<R: tl::RemoteCall>(...)
-//!   client/files.rs       upload_file / upload_media / download_media
-//!   message/mod.rs        pub use message::Message      (★ модуля `types` в crate НЕТ)
-//!   peer/mod.rs           Channel/Community/Group/User/Dialog/Permissions/Participant
-//!   examples/dialogs.rs   форма пути входа user + `while let Some(d) = dialogs.next().await?`
+//! в git не попадают). Ниже — точные строки из них, чтобы исполнитель не гадал:
+//!   client/net.rs:49        pub fn new(sender_pool: SenderPoolFatHandle) -> Self
+//!   client/auth.rs:242      pub async fn request_login_code(&self, phone: &str, api_hash: &str)
+//!                             -> Result<LoginToken, InvocationError>
+//!   client/auth.rs:339      pub async fn sign_in(&self, token: &LoginToken, code: &str)
+//!                             -> Result<User, SignInError>
+//!   client/auth.rs:416      pub async fn check_password(&self, token: PasswordToken,
+//!                             password: impl AsRef<[u8]>) -> Result<User, SignInError>
+//!   client/auth.rs:23       SignInError { SignUpRequired, PasswordRequired(PasswordToken),
+//!                             InvalidCode, InvalidPassword(PasswordToken), Other(InvocationError) }
+//!   client/chats.rs:414     pub async fn get_me(&self) -> Result<User, InvocationError>
+//!   client/dialogs.rs       DialogIter::next(&mut) -> Result<Option<Dialog>, InvocationError>
+//!   client/messages.rs      MessageIter::next(&mut) -> Result<Option<Message>, InvocationError>
+//!                             delete_messages<C: Into<PeerRef>>(peer: C, &[i32]) -> Result<usize, _>
+//!   peer/dialog.rs:90       Dialog::peer(&self) -> &Peer
+//!   peer/user.rs:103        User::id(&self) -> PeerId   (★ НЕ i64!)
+//!   peer/user.rs            username()/first_name() -> Option<&str>, is_self() -> bool
+//!   session/peer.rs         PeerId::{user_unchecked(i64), bare_id_unchecked(self) -> i64}
+//!   session/types.rs        UpdatesState {pts,qts,date,seq: i32, channels: Vec<ChannelState>}
+//!                             ChannelState {id: i64, pts: i32}
+//!                             UpdateState {All, Primary{pts,date,seq}, Secondary{qts}, Channel{id,pts}}
+//!   mtsender/sender_pool.rs SenderPool {runner, handle: SenderPoolFatHandle, updates}
+//!                             SenderPoolFatHandle {thin, session: Arc<ErasedSession>, api_id: i32}
 //!
 //! Два провала гейта, найденные ДО написания движка (это и есть цель гейтов):
 //!   1. `channels.editDescription` в LAYER 233 ОТСУТСТВУЕТ ⇒ возврат описания
@@ -30,10 +42,11 @@
 use std::sync::Arc;
 
 use grammers_client::message::Message;
-use grammers_client::session::types::PeerRef;
+use grammers_client::peer::{Dialog, Peer, User};
+use grammers_client::session::types::{PeerId, PeerInfo};
 use grammers_client::update::Update;
 use grammers_client::{Client, SignInError};
-use grammers_mtsender::{InvocationError, RpcError, SenderPool};
+use grammers_mtsender::{InvocationError, RpcError, SenderPool, SenderPoolFatHandle};
 use grammers_session::storages::MemorySession;
 use grammers_tl_types as tl;
 
@@ -45,41 +58,54 @@ async fn auth_surface(client: &Client) {
 
     if let Ok(token) = client.request_login_code("+70000000000", "hash").await {
         match client.sign_in(&token, "12345").await {
-            Ok(_) => {}
-            Err(SignInError::PasswordRequired(password_token)) => {
-                let _ = client.check_password(password_token, "secret").await;
+            Ok(_user) => {}
+            Err(SignInError::PasswordRequired(ptoken)) => {
+                let _ = client.check_password(ptoken, "secret").await;
             }
-            Err(_) => {}
+            // все пять веток SignInError перечислены ЯВНО: если layer сменится и
+            // появится шестая, компилятор обязан это поймать, а не проглотить через `_`.
+            Err(SignInError::SignUpRequired) => {}
+            Err(SignInError::InvalidCode) => {}
+            Err(SignInError::InvalidPassword(_ptoken)) => {}
+            Err(SignInError::Other(_e)) => {}
         }
     }
 }
 
 // ---------------------------------------------------------------- чтение
-/// Диалоги, участники, права, история — по формам из examples/dialogs.rs.
-async fn read_surface<C: Into<PeerRef>>(client: &Client, peer: C) {
+/// Диалоги, участники, права, история. `next()` отдаёт `Result<Option<T>, _>` —
+/// НЕ вложенный Result (первая версия этого модуля писала `if let Ok(msg) = item`,
+/// что компилировалось бы только как совпадение с внешним Ok, а внутри лежал Option:
+/// тихая потеря всех сообщений. Здесь разбирается Option явно.
+async fn read_surface(client: &Client) {
     let mut dialogs = client.iter_dialogs();
-    let _total = dialogs.total().await.unwrap_or(0);
+    let _total: usize = dialogs.total().await.unwrap_or(0);
     while let Some(dialog) = dialogs.next().await.unwrap_or(None) {
-        let p = dialog.peer();
-        let _id: i64 = p.id();
-        let _name: Option<&str> = p.name();
+        let peer: &Peer = dialog.peer();
+        let _pid: PeerId = peer.id();
+        let _raw: i64 = peer.id().bare_id_unchecked();
+        let _name: Option<&str> = peer.name();
     }
 
-    let p = peer.into();
+    let mut hist = client.iter_messages(peer_id_peer());
+    let _n: usize = hist.limit(200).total().await.unwrap_or(0);
+    while let Some(msg) = hist.next().await.unwrap_or(None) {
+        let _id: i32 = msg.id();
+        let _out: bool = msg.outgoing();
+        let _text: &str = msg.text();
+        let _peer = msg.peer_id();
+    }
+
+    let p = peer_id_peer();
     let _parts = client.iter_participants(&p).total().await;
     let _perms = client.get_permissions(&p).await;
     let _resolved = client.resolve_username("we_erti").await;
+    let _me: Result<User, InvocationError> = client.get_me().await;
+}
 
-    let mut hist = client.iter_messages(&p);
-    let _ = hist.limit(200).total().await;
-    while let Some(item) = hist.next().await.unwrap_or(None) {
-        if let Ok(msg) = item {
-            let _id: i32 = msg.id();
-            let _out: bool = msg.outgoing();
-            let _text: &str = msg.text();
-            let _peer_id = msg.peer_id();
-        }
-    }
+/// Небольшой helper, чтобы типы пиров были названы явно (PeerId → PeerRef через Into).
+fn peer_id_peer() -> PeerId {
+    PeerId::user_unchecked(5804685716)
 }
 
 // ---------------------------------------------------------------- удаление
@@ -91,7 +117,10 @@ async fn read_surface<C: Into<PeerRef>>(client: &Client, peer: C) {
 /// ★ Осторожность из док-страницы `Message::id()`: для мегагрупп/каналов
 /// `delete_messages` НЕ может проверить peer, откуда удаляется сообщение —
 /// значит движок обязан сам держать правильный peer, а не полагаться на сервер.
-async fn delete_surface<C: Into<PeerRef>>(client: &Client, peer: C) -> usize {
+async fn delete_surface<C: Into<grammers_client::session::types::PeerRef>>(
+    client: &Client,
+    peer: C,
+) -> usize {
     let ids: &[i32] = &[1, 2, 3];
     match client.delete_messages(peer, ids).await {
         Ok(n) => n,
@@ -189,9 +218,8 @@ async fn sticker_surface(client: &Client) {
 }
 
 // ---------------------------------------------------------------- файлы
-async fn file_surface<C: Into<PeerRef>>(client: &Client, peer: C, local: &str) {
+async fn file_surface(client: &Client, local: &str) {
     let _uploaded = client.upload_file(local).await;
-    let _msg = client.send_message(peer, "text").await;
 }
 
 // ---------------------------------------------------------------- апдейты
@@ -217,11 +245,17 @@ fn update_surface(msg: Message) {
 /// иначе rusqlite потребует C-компилятор на Android.
 ///
 /// ★ Док grammers предупреждает: MemorySession сам НЕ сохраняет состояние,
-/// а «логин очень дорог по flood wait» ⇒ сохранение сессии — наша фаза Ф-R2.
+/// а «логин очень дорог по flood wait» ⇒ сохранение сессии — наша фаза Ф-R2
+/// (`crate::store::FileSession`).
+///
+/// `Client::new` ПОТРЕБЛЯЕТ fat-handle (поле session/api_id читаются из него),
+/// поэтому держим копию отдельно: `handle.clone()` до передачи.
 pub fn pool_typechecks(api_id: i32) {
     let session = Arc::new(MemorySession::default());
-    let SenderPool { runner, updates, handle } = SenderPool::new(session, api_id);
-    let _client = Client::new(handle);
+    let SenderPool { runner, handle, updates } = SenderPool::new(Arc::clone(&session), api_id);
+    let fat: SenderPoolFatHandle = handle;
+    let _client = Client::new(fat.clone());
+    let _thin = fat.thin;
     let _ = (runner, updates);
 }
 
@@ -239,7 +273,7 @@ pub fn capabilities() -> Vec<(&'static str, &'static str, bool)> {
         ("оформление: описание СУПЕРГРУППЫ", "channels::EditDescription", false),
         ("FloodWait: пауза силами движка", "retry_policy.rs есть, но `mod retry_policy` не объявлен", false),
         ("стикеры", "invoke(messages::GetStickers / GetStickerSet + inputStickerSetShortName)", true),
-        ("файлы", "upload_file / send_message", true),
+        ("файлы", "upload_file", true),
         ("сессия без C-зависимостей", "MemorySession + default-features=false (нет rusqlite)", true),
     ]
 }

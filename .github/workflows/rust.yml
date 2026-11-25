@@ -5,19 +5,26 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
-# Хроника собственных ошибок CI (важнее, чем результат):
-#   раунд 1: шаги «тесты» и «caps» показали OK, хотя сборка падала — `cargo … | tail`
-#            возвращает код хвоста. Отсюда pipefail везде.
-#   раунд 2: 0 jobs за 3 с — `name: … (без стража: только печать)`, двоеточие в
-#            некавированном скаляре ломает разбор файла. YAML валидируется ДО пуша.
-#   раунд 3: 0 jobs — Cargo.toml без заголовка [package] (топ-level ключи).
-#   раунд 4: step «версия тулчейна» → exit 101. Это ПАННИКА cargo от «failed printing
-#            to stdout: Broken pipe»: `cargo tree | head -20` + pipefail. Ошибка моя,
-#            не grammers. Теперь вывод пишется в файл, а head читает файл.
-#   раунд 4: android упал на android-actions/setup-android@v3 ⇒ NDK ставим напрямую
-#            через sdkmanager, без экшена.
-#   раунд 4: `cargo test --release` несовместим с panic="abort" в profile.release ⇒
-#            тесты гоняем в dev-профиле, релиз собираем отдельно.
+# Хроника собственных ошибок CI (важнее результата) — все раунды падали на МОИХ
+# ошибках автора пайплайна, а не на grammers:
+#   раунд 1: `cargo … | tail` возвращает код хвоста ⇒ шаги показывали OK при
+#            упавшей сборке. Лечится `set -o pipefail`.
+#   раунд 2: `name: … (без стража: только печать)` — двоеточие в некавированном
+#            скаляре ⇒ YAML не разбирается ⇒ run с 0 jobs за 3 с. Лечится кавычками.
+#   раунд 3: Cargo.toml без заголовка [package] ⇒ cargo отвергает манифест, 0 jobs.
+#   раунд 4: `cargo tree | head -20` + pipefail ⇒ exit 101: Rust игнорирует SIGPIPE,
+#            cargo паникует на «failed printing to stdout: Broken pipe». Лечится
+#            «пишем в файл, читаем файл».
+#   раунд 4: `cargo test --release` несовместим с panic="abort" ⇒ тесты в dev-профиле.
+#   раунд 4: android-actions/setup-android@v3 упал ⇒ NDK ставим напрямую.
+#   раунд 5: host упал на сборке, android — на шаге NDK, но АННОТАЦИИ давали только
+#            «Process completed with exit code 1»: логи job требуют scope actions:run,
+#            которого у PAT нет (404 на /logs). Лечится тем, что лог выводится
+#            РАБОЧИМ ПРОСТОМ через `::error::` workflow-команду (виден в аннотациях
+#            и в HTML без авторизации).
+#
+# Поэтому: (1) валидация YAML/манифеста/исходников ДО пуша, (2) логи наружу,
+# (3) никаких pipe-масок, (4) NDK без сторонних экшенов.
 
 jobs:
   host:
@@ -34,21 +41,33 @@ jobs:
           set -o pipefail
           rustc --version
           cargo --version
-          cargo tree --depth 1 > tree.txt 2>&1 || { tail -40 tree.txt; exit 1; }
+          cargo tree --depth 1 > tree.txt 2>&1 || true
           sed -n '1,25p' tree.txt
 
       - name: "сборка релиза (lib cdylib + bin)"
+        id: build
         run: |
           set -o pipefail
-          cargo build --release > build.log 2>&1 || { tail -60 build.log; exit 1; }
-          tail -25 build.log
-          echo "предупреждений: $(grep -c '^warning' build.log || true)"
+          if cargo build --release > build.log 2>&1; then
+            tail -25 build.log
+            echo "предупреждений: $(grep -c '^warning' build.log || true)"
+          else
+            echo "::error::СБОРКА УПАЛА — полный лог ниже"
+            sed -n '1,120p' build.log
+            exit 1
+          fi
 
-      - name: "юнит-тесты (dev-профиль: release имеет panic=abort, тесты там не идут)"
+      - name: "юнит-тесты (dev-профиль: release имеет panic=abort)"
+        id: test
         run: |
           set -o pipefail
-          cargo test > test.log 2>&1 || { tail -80 test.log; exit 1; }
-          tail -30 test.log
+          if cargo test > test.log 2>&1; then
+            tail -30 test.log
+          else
+            echo "::error::ТЕСТЫ УПАЛИ — лог ниже"
+            sed -n '1,160p' test.log
+            exit 1
+          fi
 
       - name: "список возможностей, доказанных компилятором"
         run: |
@@ -61,6 +80,17 @@ jobs:
           set -o pipefail
           ls -la target/release/purge target/release/libpurge.so
           du -sh target/release/libpurge.so
+
+      - name: "сохранить логи на провал"
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-logs
+          path: |
+            build.log
+            test.log
+            tree.txt
+          if-no-files-found: ignore
 
   android:
     runs-on: ubuntu-latest
@@ -77,34 +107,67 @@ jobs:
           rustc --version
           cargo --version
 
-      # Без android-actions/setup-android: в раунде 4 именно он упал.
-      # Runner ubuntu-latest уже содержит $ANDROID_HOME со sdkmanager.
-      - name: "NDK r27 напрямую через sdkmanager"
+      # ubuntu-latest НЕ гарантирует $ANDROID_HOME без экшена, а экшен в раунде 4 упал.
+      # Ставим cmdline-tools сами: детерминированно и без чужих версий.
+      - name: "Android cmdline-tools (без сторонних экшенов)"
         run: |
           set -o pipefail
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          command -v sdkmanager
-          yes | sdkmanager --licenses > lic.log 2>&1 || true
-          sdkmanager --install "ndk;27.0.12077973" > ndk.log 2>&1 || { tail -30 ndk.log; exit 1; }
-          tail -5 ndk.log
+          export ANDROID_HOME="$HOME/android-sdk"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+          if curl -sL --retry 3 --max-time 300 -o /tmp/clt.zip "$URL"; then
+            echo "cmdline-tools скачан: $(stat -c%s /tmp/clt.zip) байт"
+          else
+            echo "::error::не скачал cmdline-tools (сеть runner'а)"
+            exit 1
+          fi
+          unzip -q -o /tmp/clt.zip -d "$ANDROID_HOME/cmdline-tools"
+          mv -f "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
+
+      - name: "NDK r27"
+        run: |
+          set -o pipefail
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > lic.log 2>&1 || true
+          if "$SDKM" --install "ndk;27.0.12077973" > ndk.log 2>&1; then
+            tail -4 ndk.log
+          else
+            echo "::error::sdkmanager не поставил NDK — лог ниже"
+            sed -n '1,80p' ndk.log
+            exit 1
+          fi
           NDK="$ANDROID_HOME/ndk/27.0.12077973"
-          test -d "$NDK" || { echo "нет каталога NDK: $NDK"; ls "$ANDROID_HOME/ndk" || true; exit 1; }
+          test -d "$NDK" || { echo "::error::нет каталога $NDK"; ls "$ANDROID_HOME/ndk" 2>&1 || true; exit 1; }
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-config" --version 2>/dev/null || true
           ls "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" > bins.txt 2>&1
-          grep -E "aarch64-linux-android(21|24|33)?clang(\.py)?$" bins.txt | sed -n '1,6p'
+          grep -E "aarch64-linux-android(21|24|33)?clang(\.py)?$" bins.txt || {
+            echo "::error::в NDK нет aarch64-clang"; sed -n '1,40p' bins.txt; exit 1; }
 
       - name: "cargo-ndk"
         run: |
           set -o pipefail
-          cargo install cargo-ndk --locked --version 3.0.6 > ndkinst.log 2>&1 || { tail -30 ndkinst.log; exit 1; }
-          tail -3 ndkinst.log
+          if cargo install cargo-ndk --locked --version 3.0.6 > ndkinst.log 2>&1; then
+            tail -3 ndkinst.log
+          else
+            echo "::error::cargo-ndk не установился"
+            sed -n '1,80p' ndkinst.log
+            exit 1
+          fi
 
       - name: "сборка под Android arm64-v8a"
         run: |
           set -o pipefail
-          cargo ndk -t arm64-v8a --platform 24 build --release > android.log 2>&1 || { tail -80 android.log; exit 1; }
-          tail -30 android.log
-          echo "ошибок: $(grep -c '^error' android.log || true)"
+          if cargo ndk -t arm64-v8a --platform 24 build --release > android.log 2>&1; then
+            tail -30 android.log
+            echo "ошибок: $(grep -c '^error' android.log || true)"
+          else
+            echo "::error::ANDROID-СБОРКА УПАЛА — лог ниже"
+            sed -n '1,160p' android.log
+            exit 1
+          fi
 
       - name: "проверить артефакты"
         run: |
@@ -122,3 +185,15 @@ jobs:
             target/aarch64-linux-android/release/libpurge.so
             target/aarch64-linux-android/release/purge
           if-no-files-found: error
+
+      - name: "сохранить логи на провал"
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-logs
+          path: |
+            android.log
+            ndk.log
+            bins.txt
+            ndkinst.log
+          if-no-files-found: ignore
