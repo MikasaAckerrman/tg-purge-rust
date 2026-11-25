@@ -1,0 +1,4 @@
+=== 0) проверка полей Message (чтобы не гадать) ===
+
+=== 1) создание репозитория ===
+repo: MikasaAckerrman/tg-purge-rust | private: False | err: 

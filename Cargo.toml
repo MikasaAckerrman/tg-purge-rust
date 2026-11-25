@@ -1,0 +1,33 @@
+name = "purge"
+version = "0.1.0"
+edition = "2021"
+
+# Gate 1 (PLAN_RUST §R1): этот crate должен собираться
+#   (a) для x86_64-unknown-linux-gnu  — чтобы прогонять интеграционные тесты в CI,
+#   (b) для aarch64-linux-android      — чтобы класть .so в APK.
+# grammers 0.12 требует Cargo ≥1.85 (edition2024 в grammers-tl-types),
+# поэтому локальная сборка на Alpine/rustc 1.83 НЕВОЗМОЖНА — только CI.
+
+[lib]
+name = "purge"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "purge"
+path = "src/main.rs"
+
+[dependencies]
+grammers-client = { version = "0.12.0", default-features = false }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "io-util", "net"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 4
+panic = "abort"

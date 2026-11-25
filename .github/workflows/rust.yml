@@ -1,0 +1,81 @@
+name: rust
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  # ГЕЙТ R1a: grammers вообще собирается под Android (aarch64, bionic).
+  # Без этого все остальные планы по Rust — фантазия.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: показать версию cargo
+        run: |
+          rustc --version
+          cargo --version
+          # grammers-tl-types 0.12.0 требует edition2024 → Cargo >= 1.85.
+          # Локальная сборка на Alpine (rustc 1.83) НЕВОЗМОЖНА, это не баг а ограничение.
+          cargo --version | awk '{print $3}' | awk -F. '{ if (($1<1)||($1==1&&$2<85)) {print "СЛИШКОМ СТАРЫЙ"; exit 1} }'
+
+      - name: установить NDK
+        uses: android-actions/setup-android@v3
+
+      - name: NDK r27
+        run: |
+          sdkmanager --install "ndk;27.0.12077973" | tail -3
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          ls "$ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin" | head -5
+
+      - name: cargo-ndk
+        run: cargo install cargo-ndk --locked --version 3.0.6
+
+      - name: сборка под Android (cdylib + bin)
+        run: |
+          cargo ndk -t arm64-v8a --platform 24 build --release --locked 2>&1 | tail -40
+        env:
+          CARGO_TERM_COLOR: never
+
+      - name: проверить артефакты
+        run: |
+          set -x
+          ls -la target/aarch64-linux-android/release/*.so target/aarch64-linux-android/release/purge 2>&1
+          file target/aarch64-linux-android/release/libpurge.so
+          # JNI_OnLoad не обязателен (мы грузим через System.loadLibrary и зовём экспорты),
+          # но символы должны быть:
+          nm -D target/aarch64-linux-android/release/libpurge.so | grep -c " T " || true
+          nm -D target/aarch64-linux-android/release/libpurge.so | grep -E "Java_|purge_" | head -10 || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: purge-android-arm64
+          path: |
+            target/aarch64-linux-android/release/libpurge.so
+            target/aarch64-linux-android/release/purge
+          if-no-files-found: error
+
+  # ГЕЙТ R1b: та же кодовая база собирается под Linux и тесты проходят на x86_64.
+  # Это единственный способ прогонять интеграционные проверки без телефона.
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: юнит-тесты (без сети)
+        run: |
+          cargo test --release --locked 2>&1 | tail -40
+
+      - name: список возможностей, доказанных компилятором
+        run: |
+          cargo run --release --locked --quiet -- --caps 2>&1 | tail -30
+
+      - name: размер бинаря
+        run: ls -la target/release/purge

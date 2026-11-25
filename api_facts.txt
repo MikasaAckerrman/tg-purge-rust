@@ -1,0 +1,16 @@
+== channels.edit* ==
+channels.editTitle#566decd0
+channels.editPhoto#f12e57c9
+== messages.editChat* ==
+messages.editChatTitle#73783ffd
+messages.editChatPhoto#35ddd674
+messages.editChatAbout#def60797
+== MemorySession pub fn ==
+
+== Session trait export/import ==
+/var/minis/shared/rustspike/vendor/grammers-session-0.12.0/src/session_data.rs:53:    pub async fn import_to<S: Session>(&self, session: &S) -> Result<(), S::Error> {
+== rusqlite в deps? ==
+39:default = ["sqlite-storage"]
+44:sqlite-storage = [
+== InvocationError FloodWait ==
+DONE
