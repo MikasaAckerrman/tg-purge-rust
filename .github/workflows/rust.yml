@@ -5,15 +5,19 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
-# Почему pipefail в каждой секции: в раунде 1 шаги «юнит-тесты» и «список
-# возможностей» показали OK, хотя сборка падала — конвейер `cargo ... | tail`
-# возвращает код хвоста, а не cargo.
-#
-# Почему все name в кавычках: раунд 2 упал с 0 jobs за 3 с, потому что
-# `name: версия тулчейна (без стража: только печать)` — двоеточие внутри
-# некавированного скаляра ломает разбор всего файла (проверено yaml.safe_load
-# локально: "mapping values are not allowed here", line 22). YAML теперь
-# валидируется ДО пуша, а не после падения CI.
+# Хроника собственных ошибок CI (важнее, чем результат):
+#   раунд 1: шаги «тесты» и «caps» показали OK, хотя сборка падала — `cargo … | tail`
+#            возвращает код хвоста. Отсюда pipefail везде.
+#   раунд 2: 0 jobs за 3 с — `name: … (без стража: только печать)`, двоеточие в
+#            некавированном скаляре ломает разбор файла. YAML валидируется ДО пуша.
+#   раунд 3: 0 jobs — Cargo.toml без заголовка [package] (топ-level ключи).
+#   раунд 4: step «версия тулчейна» → exit 101. Это ПАННИКА cargo от «failed printing
+#            to stdout: Broken pipe»: `cargo tree | head -20` + pipefail. Ошибка моя,
+#            не grammers. Теперь вывод пишется в файл, а head читает файл.
+#   раунд 4: android упал на android-actions/setup-android@v3 ⇒ NDK ставим напрямую
+#            через sdkmanager, без экшена.
+#   раунд 4: `cargo test --release` несовместим с panic="abort" в profile.release ⇒
+#            тесты гоняем в dev-профиле, релиз собираем отдельно.
 
 jobs:
   host:
@@ -21,8 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # edition2024 в grammers-tl-types 0.12.0 требует Cargo >= 1.85.
-      # В песочнице rustc/cargo 1.83 (Alpine) => локальная сборка невозможна.
+      # edition2024 в grammers-tl-types 0.12.0 ⇒ Cargo >= 1.85.
+      # В песочнице rustc/cargo 1.83 (Alpine) — локальная сборка невозможна.
       - uses: dtolnay/rust-toolchain@stable
 
       - name: "версия тулчейна"
@@ -30,19 +34,27 @@ jobs:
           set -o pipefail
           rustc --version
           cargo --version
-          cargo tree --depth 1 2>&1 | head -20
+          cargo tree --depth 1 > tree.txt 2>&1 || { tail -40 tree.txt; exit 1; }
+          sed -n '1,25p' tree.txt
 
-      - name: "сборка и юнит-тесты (без сети)"
+      - name: "сборка релиза (lib cdylib + bin)"
         run: |
           set -o pipefail
-          cargo build --release 2>&1 | tee build.log | tail -30
-          echo "ошибок: $(grep -c '^error' build.log || true)"
-          cargo test --release 2>&1 | tail -30
+          cargo build --release > build.log 2>&1 || { tail -60 build.log; exit 1; }
+          tail -25 build.log
+          echo "предупреждений: $(grep -c '^warning' build.log || true)"
+
+      - name: "юнит-тесты (dev-профиль: release имеет panic=abort, тесты там не идут)"
+        run: |
+          set -o pipefail
+          cargo test > test.log 2>&1 || { tail -80 test.log; exit 1; }
+          tail -30 test.log
 
       - name: "список возможностей, доказанных компилятором"
         run: |
           set -o pipefail
           ./target/release/purge --caps
+          ./target/release/purge --session-format
 
       - name: "размер артефактов"
         run: |
@@ -65,26 +77,33 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: "установить SDK/NDK"
-        uses: android-actions/setup-android@v3
-
-      - name: "NDK r27"
+      # Без android-actions/setup-android: в раунде 4 именно он упал.
+      # Runner ubuntu-latest уже содержит $ANDROID_HOME со sdkmanager.
+      - name: "NDK r27 напрямую через sdkmanager"
         run: |
           set -o pipefail
-          yes | sdkmanager --install "ndk;27.0.12077973" >/dev/null 2>&1 || sdkmanager --install "ndk;27.0.12077973"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          command -v sdkmanager
+          yes | sdkmanager --licenses > lic.log 2>&1 || true
+          sdkmanager --install "ndk;27.0.12077973" > ndk.log 2>&1 || { tail -30 ndk.log; exit 1; }
+          tail -5 ndk.log
           NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          test -d "$NDK" || { echo "нет каталога NDK: $NDK"; ls "$ANDROID_HOME/ndk" || true; exit 1; }
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-          ls "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" | grep -E "aarch64-linux-android(21|24)?clang(\.py)?$" | head -4
+          ls "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" > bins.txt 2>&1
+          grep -E "aarch64-linux-android(21|24|33)?clang(\.py)?$" bins.txt | sed -n '1,6p'
 
       - name: "cargo-ndk"
         run: |
           set -o pipefail
-          cargo install cargo-ndk --locked --version 3.0.6
+          cargo install cargo-ndk --locked --version 3.0.6 > ndkinst.log 2>&1 || { tail -30 ndkinst.log; exit 1; }
+          tail -3 ndkinst.log
 
       - name: "сборка под Android arm64-v8a"
         run: |
           set -o pipefail
-          cargo ndk -t arm64-v8a --platform 24 build --release 2>&1 | tee android.log | tail -40
+          cargo ndk -t arm64-v8a --platform 24 build --release > android.log 2>&1 || { tail -80 android.log; exit 1; }
+          tail -30 android.log
           echo "ошибок: $(grep -c '^error' android.log || true)"
 
       - name: "проверить артефакты"
@@ -92,9 +111,9 @@ jobs:
           set -o pipefail
           ls -la target/aarch64-linux-android/release/libpurge.so target/aarch64-linux-android/release/purge
           file target/aarch64-linux-android/release/libpurge.so
-          echo "=== экспортируемые символы ==="
-          nm -D --defined-only target/aarch64-linux-android/release/libpurge.so | grep -c " T " || echo "nm не дал ничего"
-          nm -D --defined-only target/aarch64-linux-android/release/libpurge.so | head -12 || true
+          nm -D --defined-only target/aarch64-linux-android/release/libpurge.so > symbols.txt 2>&1 || true
+          echo "символов T: $(grep -c ' T ' symbols.txt || true)"
+          sed -n '1,12p' symbols.txt
 
       - uses: actions/upload-artifact@v4
         with:

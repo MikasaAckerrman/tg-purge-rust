@@ -8,3 +8,41 @@ src/caps.rs: 11198 байт, скобки сбалансированы
 ИТОГ: ГОТОВО К ПУШУ
 валидация прошла
 === 2) push ===
+push exit=0 HEAD=d24804d
+=== 3) ждём CI ===
+run_id=45628431558
+state: completed / failure | created 2026-11-25T13:54:54Z
+jobs: 2
+
+JOB android: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   FAIL  5 установить SDK/NDK
+   skip  6 NDK r27
+   skip  7 cargo-ndk
+   skip  8 сборка под Android arm64-v8a
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK   20 Post Run actions/checkout@v4
+   OK   21 Complete job
+
+JOB host: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   FAIL  4 версия тулчейна
+   skip  5 сборка и юнит-тесты (без сети)
+   skip  6 список возможностей, доказанных компилятором
+   skip  7 размер артефактов
+   OK   14 Post Run actions/checkout@v4
+   OK   15 Complete job
+
+=== 4) аннотации упавших job (точные строки ошибок компилятора) ===
+--- job 139254780711 ---
+  - warning .github 2 | Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, android-actions/setup-android@v3. For more information see: https://github.blog/changelog/
+--- job 139254781102 ---
+  - warning .github 2 | Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-
+  - failure .github 18 | Process completed with exit code 101.
+R4_DONE

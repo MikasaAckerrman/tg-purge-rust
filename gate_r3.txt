@@ -8,3 +8,31 @@ KeyError: 'package'
 push exit=0 HEAD=d871087
 === 4) ждём CI и читаем вердикт ===
 run_id=45627820919
+state: completed / failure | attempts 1 | created 2026-11-25T13:51:17Z
+jobs: 2
+
+JOB host: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   FAIL  4 версия тулчейна
+   skip  5 сборка и юнит-тесты (без сети)
+   skip  6 список возможностей, доказанных компилятором
+   skip  7 размер артефактов
+   OK   14 Post Run actions/checkout@v4
+   OK   15 Complete job
+
+JOB android: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   FAIL  5 установить SDK/NDK
+   skip  6 NDK r27
+   skip  7 cargo-ndk
+   skip  8 сборка под Android arm64-v8a
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK   20 Post Run actions/checkout@v4
+   OK   21 Complete job
+R3_DONE

@@ -156,3 +156,58 @@ APK tg.purge (Kotlin, ~200 строк, только оболочка)
 * Ускорения RTT. Если R4 даст <2×, я скажу «Rust не переносим», и это не провал.
 * Совместимости с старыми Android < 24 и 32-битными ABI — не заявлял, не делаю.
 * Что APK установится сам: root/adb/shizuku нет, установка только руками юзера.
+
+---
+
+## 8. Хроника CI-раундов (25.11) — все падения были МОИМИ ошибками автора пайплайна
+
+| раунд | HEAD | что упало | корень | лечится |
+|---|---|---|---|---|
+| 1 | 3c9e2fc | шаги «тесты»/«caps» = OK при упавшей сборке | `cargo … \| tail` возвращает код хвоста | `set -o pipefail` в каждом шаге |
+| 2 | 2da5d29 | run с **0 jobs** за 3 с | `name: … (без стража: только печать)` — двоеточие в некавированном скаляре | кавычки во всех `name`; `yaml.safe_load` ДО пуша |
+| 3 | d871087 | run с 0 jobs | `Cargo.toml` без заголовка `[package]` | `tomllib`-валидация ДО пуша |
+| 4 | d24804d | step «версия тулчейна» **exit 101**; android — `setup-android@v3` | `cargo tree \| head -20` + pipefail ⇒ cargo паникует на Broken pipe (Rust игнорирует SIGPIPE); экшен NDK падает | вывод в файл, `sed/head` читают файл; NDK ставим `sdkmanager` напрямую |
+| 4 | — | `cargo test --release` | несовместим с `panic = "abort"` в `[profile.release]` | тесты в dev-профиле, релиз отдельно |
+| 5 | (в работе) | — | валидатор сам давал ложные срабатывания: делил по `\|`, попадая в `\|\|` | `re.split(r"(?<!\|)\|(?!\|)", line)` + красный тест на `/tmp/bad.yml` |
+
+Правила автора CI, вытекшие из этих шести падений (исполнитель обязан соблюдать):
+1. Локальная валидация ДО пуша (`validate_before_push.py`): tomllib, yaml.safe_load,
+   баланс скобок, запрет `cmd | head` при pipefail, запрет `_ =>` в match по
+   `UpdateState`, запрет ссылок на несуществующие модули (`grammers_client::types`,
+   `retry_policy::`).
+2. Валидатор обязан уметь краснеть: раунд 5 начинает с прогона на заведомо сломанном
+   `/tmp/bad.yml` и НЕ пушит, если тот не пойман.
+3. Никаких `| head`/`| tail` рядом с pipefail: перенаправляем в файл.
+4. Логи шагов пишем в файл и печатаем хвост только после успеха (`|| { tail -80 log; exit 1; }`).
+
+## 9. Что известно о grammers 0.12.0 ЖЕЛЕЗНО (исходники в `vendor/`, не доки)
+
+* Нет модуля `types`: `Message` в `grammers_client::message`, пиры в `grammers_client::peer`,
+  сессии в `grammers_client::session` (`pub use grammers_session as session`).
+* Все peer-методы — `<C: Into<PeerRef>>` (`PeerRef` = `grammers_client::session::types::PeerRef`).
+* `Message::id() -> i32`, `peer_id() -> PeerId`, `text() -> &str`, `outgoing() -> bool` — методы.
+* `delete_messages<C: Into<PeerRef>>(peer, &[i32]) -> Result<usize, InvocationError>` —
+  **сервер возвращает число удалённых**, то есть честный счёт возможен без
+  `_confirmed_removed` (в Python-версии это был отдельный костыль, U-D31).
+* Док `Message::id()`: для мегагрупп/каналов `delete_messages` НЕ проверяет peer ⇒
+  движок обязан держать правильный peer сам, иначе удаление уйдёт не туда.
+* `retry_policy.rs` есть в дереве, но `mod retry_policy;` нигде нет ⇒ встроенного
+  ретрая НЕТ ⇒ FLOOD_WAIT обрабатываем сами: `InvocationError::Rpc(RpcError{code:420,
+  name:"FLOOD_WAIT", value:Some(sec)})`.
+* Оформление: `channels.editTitle#566decd0`, `channels.editPhoto#f12e57c9`,
+  `messages.editChatTitle#73783ffd`, `editChatPhoto#35ddd674`, `editChatAbout#def60797`,
+  `inputChatUploadedPhoto#bdcdaec0`, `inputChatPhotoEmpty#1ca48f57` — через `invoke`.
+* **Провал гейта:** `channels.editDescription` в layer 233 ОТСУТСТВУЕТ (grep по имени
+  и по ID `f8b0a74e` — 0). Описание супергруппы: либо git-master (layer 234, коммит
+  24.11.2026), либо TDLib, либо остаётся на Python-движке.
+* `SessionData` = 4 pub-поля (`home_dc`, `dc_options: HashMap<i32, DcOption>`,
+  `peer_infos: HashMap<PeerId, PeerInfo>`, `updates_state`); внутренние типы имеют
+  serde под фичей `grammers-session/serde` (у `grammers-client` serde-passthrough НЕТ,
+  но фичи унифицируются по графу ⇒ подключаем `grammers-session = { features = ["serde"] }`
+  напрямую). `MemorySession` не сохраняет состояние и не даёт его прочитать ⇒
+  своё `FileSession` (`src/store.rs`), ключи peers восстанавливаем через `PeerInfo::id()`.
+* `sqlite-storage` ∈ default у grammers-session ⇒ `default-features = false`,
+  иначе libsql = C-компиляция на Android.
+* Методика: **отсутствие** доказываем только grep'ом по исходникам/`api.tl` и ID
+  конструктора. `strings` по `.so` доказывает лишь наличие (на этом я чуть не
+  похоронил TDLib wrongly: `sendChatMessage` не нашёлся строками, хотя метод есть).

@@ -6,12 +6,16 @@
 ответа по grammers, потому что cargo до grammers не дошёл. Проверка локально
 стоит 1 секунду, проверка в CI — 3 минуты и один сгоревший раунд.
 """
+import re
 import sys
 import tomllib
 
 import yaml
 
 ROOT = "/var/minis/shared/rustspike"
+# Путь workflow можно переопределить: так проверяем, что валидатор КРАСНЕЕТ на
+# намеренно сломанном файле (валидатор, который не умеет падеть, — бумажка).
+WF = sys.argv[1] if len(sys.argv) > 1 else f"{ROOT}/.github/workflows/rust.yml"
 ok = True
 
 # ---- Cargo.toml ----
@@ -62,7 +66,7 @@ if not man.get("bin"):
 print("профиль release:", man.get("profile", {}).get("release", {}))
 
 # ---- workflow ----
-raw = open(f"{ROOT}/.github/workflows/rust.yml", "rb").read()
+raw = open(WF, "rb").read()
 if b"\t" in raw:
     print("YAML ПЛОХО: таблица в файле")
     ok = False
@@ -86,29 +90,55 @@ else:
             if n and (":" in n) and not (n.startswith('"') or n.startswith("'")):
                 # yaml уже разобрался, но GitHub терпит; всё равно требуем кавычки в исходнике
                 pass
-            if "run" in s and "pipefail" not in s["run"] and "|" in s["run"]:
-                print(f"YAML ПЛОХО: step в {name} использует pipe без pipefail")
-                ok = False
+            run = s.get("run")
+            if run and "pipefail" in run:
+                # `cmd | head -N` + pipefail = сломанный канал ⇒ cargo паникует
+                # («failed printing to stdout: Broken pipe», exit 101 — раунд 4).
+                # Требуем: вывод пишется в файл, а head/tail/sed читают файл.
+                # ВАЖНО: `||` — это НЕ канал. Делим только по одиночному `|`,
+                # иначе валидатор флагует `cargo build > log 2>&1 || { tail log; }`
+                # и становится ложноположительным (а ложный линтер игнорируют).
+                for line in run.splitlines():
+                    parts = re.split(r"(?<!\|)\|(?!\|)", line)
+                    if len(parts) < 2 or line.strip().startswith("#"):
+                        continue
+                    for i in range(len(parts) - 1):
+                        left, right = parts[i], parts[i + 1]
+                        sender = any(t in left for t in ("cargo", "rustc", "sdkmanager", "./target"))
+                        sink = any(t in right for t in ("head", "tail", "grep", "sed"))
+                        if sender and sink:
+                            print(f"YAML ПЛОХО: сломанный канал: {line.strip()[:80]}")
+                            ok = False
     print("YAML OK: jobs =", list(jobs.keys()))
 
-# ---- Rust-исходники: грубая проверка баланса ----
-for f in ("src/main.rs", "src/caps.rs"):
-    try:
-        src = open(f"{ROOT}/{f}", encoding="utf-8").read()
-    except FileNotFoundError:
-        print(f"NET ФАЙЛА {f}")
-        ok = False
+# ---- Rust-исходники: честный баланс скобок (строки/комментарии не в счёт) ----
+# Наивный `src.count('{')` давал ЛОЖНЫЕ срабатывания: в store.rs есть
+# `std::fs::write(&path, b"{ не json ")` и скобки в doc-комментариях.
+# Ложный линтер игнорируют, поэтому считаем только код (braces.py).
+import os
+from braces import check as brace_check
+
+for f in sorted(os.listdir(f"{ROOT}/src")):
+    if not f.endswith(".rs"):
         continue
-    if src.count("{") != src.count("}"):
-        print(f"{f}: не сбалансированы фигурные скобки ({src.count('{')} vs {src.count('}')})")
-        ok = False
+    p = f"{ROOT}/src/{f}"
+    src = open(p, encoding="utf-8").read()
     if "grammers_client::types" in src:
-        print(f"{f}: ссылается на grammers_client::types — такого модуля в 0.12.0 НЕТ")
+        print(f"src/{f}: ссылается на grammers_client::types — такого модуля в 0.12.0 НЕТ")
         ok = False
     if "retry_policy::" in src:
-        print(f"{f}: использует retry_policy — модуль не объявлен в 0.12.0")
+        print(f"src/{f}: использует retry_policy — модуль не объявлен в 0.12.0")
         ok = False
-    print(f"{f}: {len(src)} байт, скобки сбалансированы")
+    if "_ => " in src and "set_update_state" in src:
+        for line in src.splitlines():
+            if line.strip().startswith("_ =>"):
+                print(f"src/{f}: `_ =>` в match — скроет новую ветку UpdateState вместо ошибки компиляции")
+                ok = False
+    if brace_check(p) != 0:
+        print(f"src/{f}: дисбаланс фигурных скобок в КОДЕ (не в строках)")
+        ok = False
+    else:
+        print(f"src/{f}: {len(src)} байт, скобки в коде сбалансированы")
 
 print()
 print("ИТОГ:", "ГОТОВО К ПУШУ" if ok else "НЕ ПУШИТЬ — сначала починить")

@@ -1,0 +1,19 @@
+=== 1) валидатор обязан КРАСНЕТЬ на pipe-ловушке раунда 4 ===
+ок: валидатор поймал ловушку
+YAML ПЛОХО: сломанный канал: cargo tree --depth 1 2>&1 | head -20
+=== 2) валидация текущих файлов ===
+ок:
+CARGO OK: package purge v0.1.0 edition=2021
+профиль release: {'opt-level': 3, 'lto': 'thin', 'strip': True, 'codegen-units': 4, 'panic': 'abort'}
+YAML OK: jobs = ['host', 'android']
+/var/minis/shared/rustspike/src/caps.rs: глубина на конце = 0; открытых незакрытых = 0
+src/caps.rs: 11198 байт, скобки в коде сбалансированы
+/var/minis/shared/rustspike/src/lib.rs: глубина на конце = 0; открытых незакрытых = 0
+src/lib.rs: 2156 байт, скобки в коде сбалансированы
+/var/minis/shared/rustspike/src/main.rs: глубина на конце = 0; открытых незакрытых = 0
+src/main.rs: 1372 байт, скобки в коде сбалансированы
+/var/minis/shared/rustspike/src/store.rs: глубина на конце = 0; открытых незакрытых = 0
+src/store.rs: 14341 байт, скобки в коде сбалансированы
+
+ИТОГ: ГОТОВО К ПУШУ
+=== 3) push ===
