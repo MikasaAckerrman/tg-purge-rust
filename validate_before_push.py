@@ -199,6 +199,51 @@ for mod in PURE_MODULES:
     else:
         print(f"PURE OK: src/{mod} — {tail[0]}")
 
+# ---- полнота match по своим enum-ам (раунд 15: E0004 на CodeError::NotE164) ----
+# Rust ловит это только при сборке, а сборка grammers-кода = 6 минут CI.
+# Проверяем узкий, но реальный класс: `impl From<Enum> for ДругойEnum` обязан
+# покрывать ВСЕ варианты либо иметь `_ =>`.
+ENUM_RE = re.compile(r"^(?:pub )?enum\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{(.*?)\n\}", re.M | re.S)
+VAR_RE = re.compile(r"^\s*(?:///[^\n]*\n\s*)?([A-Z][A-Za-z0-9_]*)\s*(?:\(|,)")
+
+
+def enum_variants(body: str):
+    out = []
+    for line in body.splitlines():
+        m = VAR_RE.match(line)
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+enums = {}
+for f in sorted(os.listdir(f"{ROOT}/src")):
+    if not f.endswith(".rs"):
+        continue
+    code = braces2.blanks(open(f"{ROOT}/src/{f}", encoding="utf-8").read())
+    for m in ENUM_RE.finditer(code):
+        enums[m.group(1)] = enum_variants(m.group(2))
+
+for f in sorted(os.listdir(f"{ROOT}/src")):
+    if not f.endswith(".rs"):
+        continue
+    code = braces2.blanks(open(f"{ROOT}/src/{f}", encoding="utf-8").read())
+    for m in re.finditer(r"impl From<([A-Za-z0-9_]+)> for ([A-Za-z0-9_]+)", code):
+        src_enum = m.group(1)
+        if src_enum not in enums:
+            continue
+        start = m.start()
+        block = code[start:start + 2500]
+        # тело impl: до следующего `impl ` или `#[cfg(test)]` на том же уровне
+        nxt = re.search(r"\n(?:impl |#\[cfg\(test\)\]|pub fn |pub async fn )", block[len(m.group(0)):])
+        if nxt:
+            block = block[:len(m.group(0)) + nxt.start()]
+        missing = [v for v in enums[src_enum] if f"{src_enum}::{v}" not in block]
+        if missing and "_ =>" not in block and "_, " not in block:
+            print(f"SRC ПЛОХО: src/{f}: impl From<{src_enum}> не покрывает варианты {missing} "
+                  f"и нет `_ =>` → E0004 на сборке")
+            ok = False
+
 # ---- Rust-исходники: честный баланс скобок (строки/комментарии не в счёт) ----
 # Наивный `src.count('{')` давал ЛОЖНЫЕ срабатывания: в store.rs есть
 # `std::fs::write(&path, b"{ ne json ")` и скобки в doc-комментариях.

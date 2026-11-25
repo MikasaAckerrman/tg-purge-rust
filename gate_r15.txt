@@ -8,3 +8,93 @@ YAML OK: jobs = ['host', 'android']
 PURE OK: src/rate.rs — test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
 PURE OK: src/util.rs — test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
 === 2) push ===
+push exit=0 HEAD=4e6c173
+=== 3) ждём CI ===
+run_id=45677724451
+=== 4) вердикт ===
+run_id=45677724451
+state: completed / failure
+
+JOB host: completed / failure
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   FAIL 5 сборка релиза (lib cdylib + bin)
+   skip  6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK   9 сохранить отчёт
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+JOB android: completed / failure
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   FAIL 8 сборка под Android arm64-v8a
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK  11 сохранить отчёт android
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+артефакты: 2
+  host-report: 2877 Б → /var/minis/shared/rustspike/logs_pull/host-report
+
+--- build.log: 114 строк, 2 ошибок
+    error[E0004]: non-exhaustive patterns: `CodeError::NotE164(_)` not covered
+      --> src/auth.rs:87:15
+       |
+    87 |         match e {
+       |               ^ pattern `CodeError::NotE164(_)` not covered
+       |
+    note: `CodeError` defined here
+   ---
+    error: could not compile `purge` (lib) due to 1 previous error
+   ---
+  android-report: 5777 Б → /var/minis/shared/rustspike/logs_pull/android-report
+
+--- android.log: 236 строк, 2 ошибок
+    error[E0004]: non-exhaustive patterns: `CodeError::NotE164(_)` not covered
+      --> src/auth.rs:87:15
+       |
+    87 |         match e {
+       |               ^ pattern `CodeError::NotE164(_)` not covered
+       |
+    note: `CodeError` defined here
+   ---
+    error: could not compile `purge` (lib) due to 1 previous error
+    note: If the build failed due to a missing target, you can run this command:
+    note: 
+    note:     rustup target install aarch64-linux-android
+   ---
+
+--- ndk.log: 93 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+    [=====================                  ] 54% Unzipping... android-ndk-r27/sourc
+    [=====================                  ] 54% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/CHANG
+    [=======================================] 100% Unzipping... android-ndk-r27/CHAN
+    
+
+--- ndkinst.log: 210 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+        Finished `release` profile [optimized] target(s) in 37.89s
+      Installing /home/runner/.cargo/bin/cargo-ndk
+      Installing /home/runner/.cargo/bin/cargo-ndk-env
+      Installing /home/runner/.cargo/bin/cargo-ndk-runner
+      Installing /home/runner/.cargo/bin/cargo-ndk-test
+       Installed package `cargo-ndk v4.1.2` (executables `cargo-ndk`, `cargo-ndk-env`, `cargo-ndk-runner`, `cargo-ndk-test`)
+
+=== 5) тест-лог (ошибки компиляции тестов) ===
+test.log нет
+
+=== 6) CAPS-таблица ===
+caps.txt нет
+R15_DONE

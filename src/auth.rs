@@ -57,6 +57,9 @@ pub enum AuthError {
     Timeout(u64),
     /// Файл-канал прочитан, но там не код.
     BadCode(String),
+    /// Телефон не E.164: SendCode с таким номером либо уйдёт в чужой аккаунт,
+    /// либо сгорит зря (ошибка №2 протокола: лишние коды 77241/36031).
+    BadPhone(String),
     /// Telegram отказал (текст ошибки без секретов).
     Denied(String),
     /// 2FA требуется, а пароля в окружении нет.
@@ -67,9 +70,13 @@ pub enum AuthError {
 
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Все ветки CodeError перечислены ЯВНО и `_ =>` нет нигде: раунд 15 упал на
+        // E0004 именно потому, что я добавил вариант NotE164 и забыл его здесь.
+        // Неполный match по своей же ошибке — это потерянный класс отказов, а не мелочь.
         match self {
             AuthError::Timeout(s) => write!(f, "код не пришёл за {s} с"),
             AuthError::BadCode(s) => write!(f, "в файле кода не код: {s:?}"),
+            AuthError::BadPhone(s) => write!(f, "номер не международный: {s}"),
             AuthError::Denied(s) => write!(f, "Telegram отказал: {s}"),
             AuthError::PasswordMissing => write!(f, "требуется 2FA, а TG_2FA_PASSWORD не задан"),
             AuthError::Store(s) => write!(f, "не сохранили сессию: {s}"),
@@ -88,6 +95,9 @@ impl From<CodeError> for AuthError {
             CodeError::Empty | CodeError::NotDigits(_) | CodeError::WrongLen(_) => {
                 AuthError::BadCode(e.to_string())
             }
+            // NotE164 — про НОМЕР, а не про код: сваливать его в BadCode значит
+            // сказать юзеру «неверный код», и он пойдёт искать ошибку в файле кода.
+            CodeError::NotE164(_) => AuthError::BadPhone(e.to_string()),
             CodeError::Fs(_) => AuthError::Store(e.to_string()),
         }
     }

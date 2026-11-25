@@ -45,16 +45,17 @@ impl Window {
         Self { limit, span, hits: Vec::new() }
     }
 
-    /// Попадания, ещё лежащие в окне. `hits` отсортирован НОВЫМИ ВПЕРЁД.
+    /// Попадания, ещё лежащие в окне: `(now-span, now]` — ОБЕ границы обязательны.
     ///
-    /// ★ Подлёт `checked_sub` (span больше, чем живут монотонные часы) обязан давать
-    ///   «ВСЕ попадания», а не «ни одного»: `unwrap_or(now)` делал окно пустым и
-    ///   тем самым разваливал лимит (fail-open в ограничителе частоты). Именно на
-    ///   таком поведении тесты становились зависимыми от аптайма машины.
+    /// ★ Верхняя граница нужна, чтобы функция была тотальной: без неё попадание с
+    ///   `t > now` (запись «из будущего») считалось потраченной квотой, и паритет
+    ///   с Python-эталоном расходился на 336 сценариях из 2029 (tools/parity.py).
+    ///   В бою `now >= max(hits)` всегда, но «недостижимая область» — это не
+    ///   оправдание: две реализации одной логики обязаны совпадать на ЛЮБОМ входе.
     fn in_window(&self, now: Instant) -> Vec<Instant> {
         match now.checked_sub(self.span) {
-            Some(cutoff) => self.hits.iter().copied().filter(|t| *t > cutoff).collect(),
-            None => self.hits.clone(),
+            Some(cutoff) => self.hits.iter().copied().filter(|t| *t > cutoff && *t <= now).collect(),
+            None => self.hits.iter().copied().filter(|t| *t <= now).collect(),
         }
     }
 
@@ -63,6 +64,16 @@ impl Window {
     pub fn wait(&self, now: Instant) -> Duration {
         if self.limit == 0 {
             return Duration::ZERO;
+        }
+        // ★ Запрос из прошлого: `now` раньше самой новой записи (часы отпрыгнули,
+        //   либо состояние перенесли). Усечение истории до `limit` новейших делает
+        //   такой запрос невычислимым, поэтому здесь НЕ угадываем, а отказываем
+        //   консервативно: ждём полное окно. Тот же контракт у Python-эталона
+        //   (core/model.py::next_allowed) — паритет на ЛЮБОМ входе, не только в бою.
+        if let Some(newest) = self.hits.first() {
+            if now < *newest {
+                return self.span;
+            }
         }
         let in_win = self.in_window(now);
         if in_win.len() < self.limit {
@@ -89,7 +100,13 @@ impl Window {
         }
         self.hits.push(now);
         self.hits.sort_by(|a, b| b.cmp(a)); // новые первыми
-        self.hits = self.in_window(now);
+        // Храним ровно `limit` новейших: более старые НЕ влияют на ответ.
+        // wait() опирается на элемент с индексом limit-1 среди попавших в окно,
+        // а всё, что новее него, уже учтено; более старое может только ВЫЙТИ из окна,
+        // но не сдвинуть границу. Поэтому усечение безопасно и держит RAM = O(limit).
+        // (Раньше здесь было усечение по ВРЕМЕНИ ЗАПИСИ — из-за этого паритет с
+        //  Python ломался на запросах, где now старше части истории.)
+        self.hits.truncate(self.limit);
     }
 
     pub fn len(&self) -> usize {
@@ -270,6 +287,20 @@ mod tests {
         assert!(w.allow(at(t0, 11)));
         w.record(at(t0, 11));
         assert_eq!(w.len(), 1, "старые должны вылететь из окна");
+    }
+
+    #[test]
+    fn window_past_query_denies_conservatively() {
+        // ★ Паритет с Python (tools/parity.py): now раньше самой новой записи —
+        //   история усечена до limit новейших, точного ответа нет ⇒ отказ на всё окно.
+        let t0 = Instant::now();
+        let mut w = Window::new(2, Duration::from_secs(10));
+        w.record(at(t0, 0));
+        w.record(at(t0, 10));
+        assert_eq!(w.wait(t0), Duration::from_secs(10), "запрос из прошлого не должен разрешать");
+        assert!(!w.allow(at(t0, 0)));
+        // в достижимой области — как обычно
+        assert_eq!(w.wait(at(t0, 10)), Duration::ZERO);
     }
 
     #[test]
