@@ -165,6 +165,15 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if re.search(r"InputFile::InputFile\b|InputChatPhoto::InputChatPhoto\b", code):
         print(f"src/{f}: префикс типа у варианта отрезается (InputFile::File / InputChatPhoto::…)")
         ok = False
+    # раунд 8: варианты без параметров генерируются UNIT (enums.rs:73-77)
+    for unit in ("InputChatPhoto::Empty", "InputPeer::PeerSelf", "InputChannel::Empty",
+                 "InputStickerSet::Empty"):
+        if f"{unit}(" in code:
+            print(f"src/{f}: {unit} — UNIT-вариант (конструктор без params), скобки вызывать нельзя (E0618)")
+            ok = False
+    if re.search(r"tl::types::(InputChatPhotoEmpty|InputPeerSelf|InputChannelEmpty|InputStickerSetEmpty)\b", code):
+        print(f"src/{f}: у unit-конструкторов структуры НЕТ вовсе (enums.rs:73-77)")
+        ok = False
     # раунд 7: limit(mut self) -> Self потребляет итератор (E0382)
     for line in code.splitlines():
         s = line.strip()

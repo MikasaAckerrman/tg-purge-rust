@@ -43,6 +43,12 @@
 //!   inputPeerSelf#7da07ec9                                                          = InputPeer
 //!   inputStickerSetShortName#861cc8a0 short_name:string                           = InputStickerSet
 //!   ★ `inputFileUploaded` НЕ существует (раунд 6: E0422) — есть inputFile/inputFileBig.
+//!   ★ ВАРИАНТЫ БЕЗ ПАРАМЕТРОВ — UNIT, без скобки и без структуры (enums.rs:73-77:
+//!     «Variant with no struct since it has no data and it only adds noise»):
+//!       tl::enums::InputChatPhoto::Empty      (inputChatPhotoEmpty#1ca48f57)
+//!       tl::enums::InputPeer::PeerSelf        (inputPeerSelf#7da07ec9)
+//!       tl::enums::InputChannel::Empty        (inputChannelEmpty#ee8c1e86)
+//!     Звать их как `Empty(X)` = E0618 «expected function, found …» (раунд 8).
 //!   ★ ИМЕНА ВАРИАНТОВ (rustifier.rs:92-122, проверено по его же тестам):
 //!     от имени конструктора отрезается префикс типа; «Self» → вторая с конца
 //!     заглавная буква; всё-цифровое → последняя заглавная. Практика:
@@ -193,8 +199,11 @@ async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) 
 
     let clear = tl::functions::channels::EditPhoto {
         channel: channel.clone(),
-        // inputChatPhotoEmpty#1ca48f57 = InputChatPhoto → вариант `Empty`
-        photo: tl::enums::InputChatPhoto::Empty(tl::types::InputChatPhotoEmpty),
+        // ★ inputChatPhotoEmpty#1ca48f57 ПАРАМЕТРОВ НЕТ ⇒ генератор делает
+        //   UNIT-вариант без скобки (enums.rs:73-77: «Variant with no struct since
+        //   it has no data and it only adds noise»). Раунд 8: E0618 «expected
+        //   function, found InputChatPhoto» — я звал Empty(...).
+        photo: tl::enums::InputChatPhoto::Empty,
     };
     let _ = client.invoke(&clear).await;
 
@@ -222,7 +231,7 @@ async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) 
     //   inputPeerSelf возвращает variant "Self", который заменяется на имя из
     //   предпоследней заглавной буквы (rustifier.rs:96-107, тест
     //   check_def_self_variant_name: "inputPeerSelf = InputPeer" → "PeerSelf").
-    let peer = tl::enums::InputPeer::PeerSelf(tl::types::InputPeerSelf);
+    let peer = tl::enums::InputPeer::PeerSelf;
     let about = tl::functions::messages::EditChatAbout {
         peer,
         about: String::new(),
