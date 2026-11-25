@@ -24,8 +24,13 @@ fn main() {
 
 fn print_caps() {
     let rows = caps::capabilities();
+    // Считаем ДО цикла: for (name, proof, ok) in rows ПОТРЕБЛЯЕТ Vec
+    // (раунд 10: E0382 «borrow of moved value: rows»).
+    let total = rows.len();
+    let missing = rows.iter().filter(|(_, _, ok)| !*ok).count();
+    let sep = "-".repeat(112);
     println!("{:<44} {:<58} {}", "ВОЗМОЖНОСТЬ", "ЧЕМ ДОКАЗАНО", "ЕСТЬ");
-    println!("{}", "-".repeat(112));
+    println!("{sep}");
     for (name, proof, ok) in rows {
         println!(
             "{:<44} {:<58} {}",
@@ -34,12 +39,13 @@ fn print_caps() {
             if ok { "да" } else { "НЕТ — гейт не пройден" }
         );
     }
-    let missing = rows.iter().filter(|(_, _, ok)| !*ok).count();
-    println!("-".repeat(112).as_str());
+    // ★ println!("-".repeat(..)) — format-строка обязана быть литералом
+    //   (раунд 10: «expected `,`, found .» + «argument never used»).
+    println!("{sep}");
     println!(
         "итого: {} из {} доступно; непройденных гейтов: {}",
-        rows.len() - missing,
-        rows.len(),
+        total - missing,
+        total,
         missing
     );
     let _ = std::io::stdout().flush();

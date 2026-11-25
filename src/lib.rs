@@ -13,6 +13,7 @@
 
 pub mod auth;
 pub mod caps;
+pub mod engine;
 pub mod store;
 
 pub use store::{FileSession, FORMAT_VERSION, StoreError};
@@ -40,17 +41,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn caps_report_has_two_known_gaps() {
-        // Гейт R3: ровно два известных провала. Если их станет больше — тест падает,
-        // и план меняется до написания движка, а не после.
+    fn caps_report_has_one_known_gap() {
+        // ГЕЙТ R3: ровно ОДИН непройденный пункт — описание супергруппы.
+        // Второй «провал», который я заявлял про FloodWait, оказался МОЕЙ ошибкой:
+        // AutoSleep реально подключён в grammers-mtsender (configuration.rs:123,198),
+        // мёртв только файл grammers-client/src/client/retry_policy.rs.
+        // Если список изменится — тест падает, и план правится ДО написания движка.
         let rows = crate::caps::capabilities();
         let gaps: Vec<_> = rows.iter().filter(|(_, _, ok)| !*ok).map(|(n, _, _)| *n).collect();
         assert_eq!(
             gaps,
-            vec![
-                "оформление: описание СУПЕРГРУППЫ",
-                "FloodWait: пауза силами движка",
-            ],
+            vec!["оформление: описание СУПЕРГРУППЫ"],
             "список непройденных гейтов изменился: {gaps:?}"
         );
         assert!(rows.len() >= 12);

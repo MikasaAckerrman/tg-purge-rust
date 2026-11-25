@@ -73,10 +73,18 @@
 //!   ★ `channels.editDescription` в слое 233 НЕ существует — провал гейта №1.
 //!
 //! Провалы гейта, найденные ДО боевого кода (это и есть цель спайка):
-//!   1. описание супергруппы редактировать нечем → git-master (layer 234) / TDLib / Python;
-//!   2. `retry_policy.rs` есть в дереве, но `mod retry_policy;` нигде не объявлен
-//!      (grep по всему src/: совпадения только внутри самого файла) ⇒ FLOOD_WAIT
-//!      обрабатывает только наш движок.
+//!   1. описание супергруппы редактировать нечем → git-master (layer 234) / TDLib / Python.
+//!   2. ★ МОЁ ЛОЖНОЕ УТВЕРЖДЕНИЕ, исправлено чтением исходников (раунд 10):
+//!      файл `grammers-client/src/client/retry_policy.rs` действительно НЕ подключён
+//!      (`mod retry_policy;` нигде нет), НО политики повторных попыток живут в
+//!      `grammers-mtsender/src/configuration.rs` и РЕАЛЬНО используются:
+//!        lib.rs:33         pub use configuration::{… RetryPolicy, NoRetries, AutoSleep …}
+//!        configuration.rs:123 impl Default for ConnectionParams → AutoSleep::default()
+//!        configuration.rs:198 AutoSleep { tries: NonZeroU32::MIN (=1), threshold: 60 s,
+//!                                         io_errors_as_flood_of: Some(1 s) }
+//!      Практический вывод: FLOOD_WAIT ≤ 60 с ретраится библиотекой ОДИН раз, а всё,
+//!      что ДЛИНЬЕ 60 с или требует больше одной попытки, приходит к нам как ошибка —
+//!      значит движок обязан ставить чистку/правило на паузу сам.
 
 #![allow(dead_code)]
 
@@ -352,7 +360,7 @@ pub fn capabilities() -> Vec<(&'static str, &'static str, bool)> {
         ("оформление: фото", "invoke(channels::EditPhoto#f12e57c9 + inputChatUploadedPhoto#bdcdaec0)", true),
         ("оформление: описание базовой группы", "invoke(messages::EditChatAbout#def60797 peer:InputPeer)", true),
         ("оформление: описание СУПЕРГРУППЫ", "channels::EditDescription", false),
-        ("FloodWait: пауза силами движка", "retry_policy.rs есть, но `mod retry_policy` не объявлен", false),
+        ("FloodWait: ретраит mtsender (порог 60 с)", "ConnectionParams::default() = AutoSleep{tries=1,threshold=60s}; клиентский retry_policy.rs — мёртвый файл", true),
         ("стикеры", "invoke(messages::GetStickers / GetStickerSet + inputStickerSetShortName)", true),
         ("файлы", "upload_file", true),
         ("сессия без C-зависимостей", "MemorySession + default-features=false (нет rusqlite)", true),

@@ -1,0 +1,173 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling hybrid-array v0.4.15
+   Compiling crc32fast v1.5.6
+   Compiling cmov v0.5.4
+   Compiling libc v0.2.191
+   Compiling ctutils v0.4.8
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling autocfg v1.5.1
+   Compiling cfg-if v1.0.5
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.10
+   Compiling const-oid v0.10.3
+   Compiling rand_core v0.10.1
+   Compiling digest v0.11.3
+   Compiling grammers-tl-parser v2.0.0
+   Compiling serde_core v1.0.229
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling cpubits v0.1.1
+   Compiling grammers-tl-gen v0.12.0
+   Compiling inout v0.2.6
+   Compiling cpufeatures v0.3.1
+   Compiling getrandom v0.4.3
+   Compiling pin-project-lite v0.2.18
+   Compiling thiserror v2.0.21
+   Compiling cipher v0.5.2
+   Compiling grammers-tl-types v0.12.0
+   Compiling crypto-bigint v0.7.11
+   Compiling num-integer v0.1.47
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.21
+   Compiling syn v2.0.119
+   Compiling once_cell v1.21.4
+   Compiling cfg_aliases v0.2.2
+   Compiling nix v0.31.4
+   Compiling tracing-core v0.1.36
+   Compiling darling_macro v0.24.1
+   Compiling darling v0.24.1
+   Compiling crypto-primes v0.7.2
+   Compiling num-bigint v0.5.1
+   Compiling hmac v0.13.0
+   Compiling adler2 v2.0.1
+   Compiling serde v1.0.229
+   Compiling simd-adler32 v0.3.10
+   Compiling tracing-attributes v0.1.31
+   Compiling miniz_oxide v0.9.1
+   Compiling tracing v0.1.44
+   Compiling pbkdf2 v0.13.0
+   Compiling glass_pumpkin v2.0.0
+   Compiling serde_with_macros v3.25.0
+   Compiling serde_derive v1.0.229
+   Compiling aes v0.9.4
+   Compiling ctr v0.10.1
+   Compiling sha1 v0.11.0
+   Compiling sha2 v0.11.2
+   Compiling unicase v2.10.0
+   Compiling hex v0.4.3
+   Compiling log v0.4.35
+   Compiling bitflags v2.13.2
+   Compiling serde_with v3.25.0
+   Compiling mime_guess v2.0.5
+   Compiling grammers-crypto v0.12.0
+   Compiling flate2 v1.1.11
+   Compiling tokio-macros v2.7.2
+   Compiling mio v1.2.5
+   Compiling socket2 v0.6.5
+   Compiling bytes v1.12.2
+   Compiling zmij v1.0.23
+   Compiling tokio v1.54.1
+   Compiling os_info v3.15.0
+   Compiling locate-locale v0.2.0
+   Compiling jiff-core v0.1.8
+   Compiling slab v0.4.12
+   Compiling mime v0.3.18
+   Compiling serde_json v1.0.154
+   Compiling futures-task v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling jiff v0.2.46
+   Compiling httpdate v1.0.3
+   Compiling chunked_transfer v1.5.0
+   Compiling itoa v1.0.19
+   Compiling ascii v1.1.0
+   Compiling md5 v0.8.1
+   Compiling memchr v2.8.3
+   Compiling tiny_http v0.12.0
+   Compiling grammers-mtproto v0.12.0
+   Compiling grammers-session v0.12.0
+   Compiling grammers-mtsender v0.12.0
+   Compiling grammers-client v0.12.0
+   Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+warning: unused import: `std::collections::HashMap`
+  --> src/store.rs:34:5
+   |
+34 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `purge` (lib) generated 1 warning (run `cargo fix --lib -p purge` to apply 1 suggestion)
+error: expected `,`, found `.`
+  --> src/main.rs:38:17
+   |
+38 |     println!("-".repeat(112).as_str());
+   |                 ^ expected `,`
+
+error: argument never used
+  --> src/main.rs:38:18
+   |
+38 |     println!("-".repeat(112).as_str());
+   |              --- ^^^^^^^^^^^^^^^^^^^^ argument never used
+   |              |
+   |              formatting specifier missing
+   |
+help: format specifiers use curly braces, consider adding a format specifier
+   |
+38 |     println!("-{}".repeat(112).as_str());
+   |                ++
+
+error[E0425]: cannot find function `repeat` in this scope
+  --> src/main.rs:38:18
+   |
+38 |     println!("-".repeat(112).as_str());
+   |                  ^^^^^^ not found in this scope
+   |
+help: consider importing one of these functions
+   |
+ 6 + use std::array::repeat;
+   |
+ 6 + use std::io::repeat;
+   |
+ 6 + use std::iter::repeat;
+   |
+ 6 + use core::array::repeat;
+   |
+   = and 1 other candidate
+
+error[E0382]: borrow of moved value: `rows`
+  --> src/main.rs:37:19
+   |
+26 |     let rows = caps::capabilities();
+   |         ---- move occurs because `rows` has type `Vec<(&str, &str, bool)>`, which does not implement the `Copy` trait
+...
+29 |     for (name, proof, ok) in rows {
+   |                              ---- `rows` moved due to this implicit call to `.into_iter()`
+...
+37 |     let missing = rows.iter().filter(|(_, _, ok)| !*ok).count();
+   |                   ^^^^ value borrowed here after move
+   |
+note: the `for` loop is desugared into a call to `std::iter::IntoIterator::into_iter`, which takes ownership of the receiver `self`, which moves `rows`
+  --> /rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/iter/traits/collect.rs:312:17
+   = note: borrow occurs due to deref coercion to `[(&str, &str, bool)]`
+help: consider iterating over a slice of the `Vec<(&str, &str, bool)>`'s content to avoid moving into the `for` loop
+   |
+29 |     for (name, proof, ok) in &rows {
+   |                              +
+
+Some errors have detailed explanations: E0382, E0425.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `purge` (bin "purge") due to 4 previous errors
+warning: unused dependency `tiny_http`
+  --> Cargo.toml:38:1
+   |
+38 | tiny_http = "0.12"
+   | ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `tiny_http`
+warning: `purge` (manifest) generated 1 warning

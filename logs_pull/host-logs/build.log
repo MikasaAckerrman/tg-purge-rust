@@ -1,0 +1,173 @@
+[1m[92m   Compiling[0m proc-macro2 v1.0.107
+[1m[92m   Compiling[0m unicode-ident v1.0.27
+[1m[92m   Compiling[0m quote v1.0.47
+[1m[92m   Compiling[0m typenum v1.20.1
+[1m[92m   Compiling[0m hybrid-array v0.4.15
+[1m[92m   Compiling[0m crc32fast v1.5.6
+[1m[92m   Compiling[0m cmov v0.5.4
+[1m[92m   Compiling[0m libc v0.2.191
+[1m[92m   Compiling[0m ctutils v0.4.8
+[1m[92m   Compiling[0m crypto-common v0.2.2
+[1m[92m   Compiling[0m block-buffer v0.12.1
+[1m[92m   Compiling[0m autocfg v1.5.1
+[1m[92m   Compiling[0m cfg-if v1.0.5
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m syn v3.0.10
+[1m[92m   Compiling[0m const-oid v0.10.3
+[1m[92m   Compiling[0m rand_core v0.10.1
+[1m[92m   Compiling[0m digest v0.11.3
+[1m[92m   Compiling[0m grammers-tl-parser v2.0.0
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m strsim v0.11.1
+[1m[92m   Compiling[0m ident_case v1.0.1
+[1m[92m   Compiling[0m cpubits v0.1.1
+[1m[92m   Compiling[0m grammers-tl-gen v0.12.0
+[1m[92m   Compiling[0m inout v0.2.6
+[1m[92m   Compiling[0m cpufeatures v0.3.1
+[1m[92m   Compiling[0m getrandom v0.4.3
+[1m[92m   Compiling[0m pin-project-lite v0.2.18
+[1m[92m   Compiling[0m thiserror v2.0.21
+[1m[92m   Compiling[0m cipher v0.5.2
+[1m[92m   Compiling[0m grammers-tl-types v0.12.0
+[1m[92m   Compiling[0m crypto-bigint v0.7.11
+[1m[92m   Compiling[0m num-integer v0.1.47
+[1m[92m   Compiling[0m darling_core v0.24.1
+[1m[92m   Compiling[0m thiserror-impl v2.0.21
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m cfg_aliases v0.2.2
+[1m[92m   Compiling[0m nix v0.31.4
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m darling_macro v0.24.1
+[1m[92m   Compiling[0m darling v0.24.1
+[1m[92m   Compiling[0m crypto-primes v0.7.2
+[1m[92m   Compiling[0m num-bigint v0.5.1
+[1m[92m   Compiling[0m hmac v0.13.0
+[1m[92m   Compiling[0m adler2 v2.0.1
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m simd-adler32 v0.3.10
+[1m[92m   Compiling[0m tracing-attributes v0.1.31
+[1m[92m   Compiling[0m miniz_oxide v0.9.1
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m pbkdf2 v0.13.0
+[1m[92m   Compiling[0m glass_pumpkin v2.0.0
+[1m[92m   Compiling[0m serde_with_macros v3.25.0
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m   Compiling[0m aes v0.9.4
+[1m[92m   Compiling[0m ctr v0.10.1
+[1m[92m   Compiling[0m sha1 v0.11.0
+[1m[92m   Compiling[0m sha2 v0.11.2
+[1m[92m   Compiling[0m unicase v2.10.0
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m log v0.4.35
+[1m[92m   Compiling[0m bitflags v2.13.2
+[1m[92m   Compiling[0m serde_with v3.25.0
+[1m[92m   Compiling[0m mime_guess v2.0.5
+[1m[92m   Compiling[0m grammers-crypto v0.12.0
+[1m[92m   Compiling[0m flate2 v1.1.11
+[1m[92m   Compiling[0m tokio-macros v2.7.2
+[1m[92m   Compiling[0m mio v1.2.5
+[1m[92m   Compiling[0m socket2 v0.6.5
+[1m[92m   Compiling[0m bytes v1.12.2
+[1m[92m   Compiling[0m zmij v1.0.23
+[1m[92m   Compiling[0m tokio v1.54.1
+[1m[92m   Compiling[0m os_info v3.15.0
+[1m[92m   Compiling[0m locate-locale v0.2.0
+[1m[92m   Compiling[0m jiff-core v0.1.8
+[1m[92m   Compiling[0m slab v0.4.12
+[1m[92m   Compiling[0m mime v0.3.18
+[1m[92m   Compiling[0m serde_json v1.0.154
+[1m[92m   Compiling[0m futures-task v0.3.34
+[1m[92m   Compiling[0m futures-core v0.3.34
+[1m[92m   Compiling[0m futures-util v0.3.34
+[1m[92m   Compiling[0m jiff v0.2.46
+[1m[92m   Compiling[0m httpdate v1.0.3
+[1m[92m   Compiling[0m chunked_transfer v1.5.0
+[1m[92m   Compiling[0m itoa v1.0.19
+[1m[92m   Compiling[0m ascii v1.1.0
+[1m[92m   Compiling[0m md5 v0.8.1
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m tiny_http v0.12.0
+[1m[92m   Compiling[0m grammers-mtproto v0.12.0
+[1m[92m   Compiling[0m grammers-session v0.12.0
+[1m[92m   Compiling[0m grammers-mtsender v0.12.0
+[1m[92m   Compiling[0m grammers-client v0.12.0
+[1m[92m   Compiling[0m purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+[1m[33mwarning[0m[1m: unused import: `std::collections::HashMap`[0m
+  [1m[94m--> [0msrc/store.rs:34:5
+   [1m[94m|[0m
+[1m[94m34[0m [1m[94m|[0m use std::collections::HashMap;
+   [1m[94m|[0m     [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m: `purge` (lib) generated 1 warning (run `cargo fix --lib -p purge` to apply 1 suggestion)
+[1m[91merror[0m[1m: expected `,`, found `.`[0m
+  [1m[94m--> [0msrc/main.rs:38:17
+   [1m[94m|[0m
+[1m[94m38[0m [1m[94m|[0m     println!("-".repeat(112).as_str());
+   [1m[94m|[0m                 [1m[91m^[0m [1m[91mexpected `,`[0m
+
+[1m[91merror[0m[1m: argument never used[0m
+  [1m[94m--> [0msrc/main.rs:38:18
+   [1m[94m|[0m
+[1m[94m38[0m [1m[94m|[0m     println!("-".repeat(112).as_str());
+   [1m[94m|[0m              [1m[94m---[0m [1m[91m^^^^^^^^^^^^^^^^^^^^[0m [1m[91margument never used[0m
+   [1m[94m|[0m              [1m[94m|[0m
+   [1m[94m|[0m              [1m[94mformatting specifier missing[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: format specifiers use curly braces, consider adding a format specifier
+   [1m[94m|[0m
+[1m[94m38[0m [1m[94m| [0m    println!("-[92m{}[0m".repeat(112).as_str());
+   [1m[94m|[0m                [92m++[0m
+
+[1m[91merror[E0425][0m[1m: cannot find function `repeat` in this scope[0m
+  [1m[94m--> [0msrc/main.rs:38:18
+   [1m[94m|[0m
+[1m[94m38[0m [1m[94m|[0m     println!("-".repeat(112).as_str());
+   [1m[94m|[0m                  [1m[91m^^^^^^[0m [1m[91mnot found in this scope[0m
+   [1m[94m|[0m
+[1m[96mhelp[0m: consider importing one of these functions
+   [1m[94m|[0m
+[1m[94m 6[0m [92m+ use std::array::repeat;[0m
+   [1m[94m|[0m
+[1m[94m 6[0m [92m+ use std::io::repeat;[0m
+   [1m[94m|[0m
+[1m[94m 6[0m [92m+ use std::iter::repeat;[0m
+   [1m[94m|[0m
+[1m[94m 6[0m [92m+ use core::array::repeat;[0m
+   [1m[94m|[0m
+   [1m[94m= [0mand 1 other candidate
+
+[1m[91merror[E0382][0m[1m: borrow of moved value: `rows`[0m
+  [1m[94m--> [0msrc/main.rs:37:19
+   [1m[94m|[0m
+[1m[94m26[0m [1m[94m|[0m     let rows = caps::capabilities();
+   [1m[94m|[0m         [1m[94m----[0m [1m[94mmove occurs because `rows` has type `Vec<(&str, &str, bool)>`, which does not implement the `Copy` trait[0m
+[1m[94m...[0m
+[1m[94m29[0m [1m[94m|[0m     for (name, proof, ok) in rows {
+   [1m[94m|[0m                              [1m[94m----[0m [1m[94m`rows` moved due to this implicit call to `.into_iter()`[0m
+[1m[94m...[0m
+[1m[94m37[0m [1m[94m|[0m     let missing = rows.iter().filter(|(_, _, ok)| !*ok).count();
+   [1m[94m|[0m                   [1m[91m^^^^[0m [1m[91mvalue borrowed here after move[0m
+   [1m[94m|[0m
+[1m[92mnote[0m: the `for` loop is desugared into a call to `std::iter::IntoIterator::into_iter`, which takes ownership of the receiver `self`, which moves `rows`
+  [1m[94m--> [0m/rustc/0ef1bc386059596dada8fb65b50425aab2ea637a/library/core/src/iter/traits/collect.rs:312:17
+   [1m[94m= [0m[1mnote[0m: borrow occurs due to deref coercion to `[(&str, &str, bool)]`
+[1m[96mhelp[0m: consider iterating over a slice of the `Vec<(&str, &str, bool)>`'s content to avoid moving into the `for` loop
+   [1m[94m|[0m
+[1m[94m29[0m [1m[94m| [0m    for (name, proof, ok) in [92m&[0mrows {
+   [1m[94m|[0m                              [92m+[0m
+
+[1mSome errors have detailed explanations: E0382, E0425.[0m
+[1mFor more information about an error, try `rustc --explain E0382`.[0m
+[1m[91merror[0m: could not compile `purge` (bin "purge") due to 4 previous errors
+[1m[33mwarning[0m[1m: unused dependency `tiny_http`[0m
+  [1m[94m--> [0mCargo.toml:38:1
+   [1m[94m|[0m
+[1m[94m38[0m [1m[94m|[0m tiny_http = "0.12"
+   [1m[94m|[0m [1m[33m^^^^^^^^^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `cargo::unused_dependencies` is set to `warn` by default
+[1m[96mhelp[0m: consider removing the dependency on `tiny_http`
+[1m[33mwarning[0m: `purge` (manifest) generated 1 warning

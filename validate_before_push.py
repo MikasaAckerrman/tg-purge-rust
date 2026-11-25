@@ -124,17 +124,20 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
         continue
     p = f"{ROOT}/src/{f}"
     src = open(p, encoding="utf-8").read()
+    # ВАЖНО: все проверки ниже идут по коду БЕЗ строк и комментариев — иначе
+    # собственная doc-строка детектируется как реальный баг (ложное срабатывание,
+    # из-за которого валидатору перестают верить).
+    code = braces2.blanks(src)
     if "grammers_client::types" in src:
         print(f"src/{f}: ссылается на grammers_client::types — такого модуля в 0.12.0 НЕТ")
         ok = False
-    if "retry_policy::" in src:
-        print(f"src/{f}: использует retry_policy — модуль не объявлен в 0.12.0")
+    # раунд 10: retry-политики РЕАЛЬНО есть в grammers-mtsender (configuration.rs:123,198)
+    # и подключены через ConnectionParams::default(); мёртв только файл
+    # grammers-client/src/client/retry_policy.rs. Утверждать обратное запрещает тест.
+    if "retry_policy.rs" in code and "AutoSleep" not in code:
+        print(f"src/{f}: утверждение про retry_policy без AutoSleep — это моя прошлая ошибка")
         ok = False
     # ловим конкретные сигнатурные ошибки, на которых я уже падал (раунды 5–6).
-    # ВАЖНО: проверяем по коду БЕЗ строк и комментариев — иначе собственная
-    # doc-строка про «if let Ok(msg) = item» детектируется как реальный баг
-    # (ложное срабатывание, из-за которого валидатору перестают верить).
-    code = braces2.blanks(src)
     if "get_me()" in code and ".await" not in code.split("get_me()")[1][:40]:
         print(f"src/{f}: get_me() без .await — это async (chats.rs:414)")
         ok = False
