@@ -1,0 +1,7 @@
+=== 1) валидация YAML до пуша ===
+yaml OK
+=== 2) валидация Cargo.toml (parsecrate) ===
+Traceback (most recent call last):
+  File "<string>", line 4, in <module>
+KeyError: 'package'
+=== 3) push ===

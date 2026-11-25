@@ -2,11 +2,12 @@ name = "purge"
 version = "0.1.0"
 edition = "2021"
 
-# Gate 1 (PLAN_RUST §R1): этот crate должен собираться
-#   (a) для x86_64-unknown-linux-gnu  — чтобы прогонять интеграционные тесты в CI,
-#   (b) для aarch64-linux-android      — чтобы класть .so в APK.
-# grammers 0.12 требует Cargo ≥1.85 (edition2024 в grammers-tl-types),
-# поэтому локальная сборка на Alpine/rustc 1.83 НЕВОЗМОЖНА — только CI.
+# ГЕЙТ R1 (PLAN_RUST §3): crate обязан собираться для
+#   (a) x86_64-unknown-linux-gnu  — интеграционные тесты в CI,
+#   (b) aarch64-linux-android     — .so внутрь APK.
+# Локально в песочнице собирать НЕВОЗМОЖНО: grammers-tl-types 0.12.0 имеет
+# edition = "2024" ⇒ Cargo >= 1.85, а в Alpine rustc/cargo 1.83
+# (`cargo fetch` падает на rand_core 0.10.1). Это ограничение тулчейна, не баг.
 
 [lib]
 name = "purge"
@@ -17,13 +18,23 @@ name = "purge"
 path = "src/main.rs"
 
 [dependencies]
-grammers-client = { version = "0.12.0", default-features = false }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "io-util", "net"] }
+# default-features = false убирает sqlite-storage ⇒ libsql/rusqlite (C-зависимость)
+# не попадает в граф, и Android собирается без C-компилятора.
+# "fs" оставляем: upload_file по пути требует tokio/fs.
+grammers-client = { version = "0.12.0", default-features = false, features = ["fs"] }
+# ★ Сессия сохраняется НАМИ (grammers прямо предупреждает: MemorySession не умеет
+# персистентности, а повторный лин costly по flood wait). Внутренние типы
+# DcOption/PeerInfo/UpdatesState имеют serde под фичей grammers-session "serde",
+# а фичи в Cargo унифицируются по графу — поэтому подключаем её здесь напрямую,
+# несмотря на то что grammers-client собственного serde-passthrough не имеет
+# (его features: default=["fs"], html, markdown, parse_invite_link, proxy).
+grammers-session = { version = "0.12.0", default-features = false, features = ["serde"] }
+grammers-mtsender = { version = "0.12.0", default-features = false }
+grammers-tl-types = { version = "0.12.0", default-features = false }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "io-util", "net", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tiny_http = "0.12"
-
-[dev-dependencies]
 
 [profile.release]
 opt-level = 3

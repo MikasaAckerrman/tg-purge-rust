@@ -1,0 +1,6 @@
+push exit=0 HEAD=2da5d29
+run_id=45626314928
+state: completed / failure | attempt 1
+
+=== логи упавших job (текстовые, не zip) ===
+ROUND2_DONE
