@@ -1,15 +1,18 @@
-//! Ф-R4 — боевая логика очистителя. ЧИСТЫЕ функции + один живой цикл.
+//! Ф-R4 — живой код очистителя: всё, что ОБЯЗАНО компилироваться с grammers.
 //!
-//! Разделение обязательное: всё, что можно проверить без сети, лежит в чистых
-//! функциях (`Window`, `Registry`, `guard_saved`, `plan_batches`) и покрывается
-//! юнит-тестами ниже. Живой код (`run_stream`) только вызывает их и обязан
-//! проходить гейт R3 (компиляция) — никаких догадок о типах здесь нет, каждая
-//! форма сверена с vendor-исходниками (см. ссылки в комментариях):
+//! ★ Чистая логика (Window/Registry/guard_saved/plan_batches + 20 тестов) вынесена
+//!   в `crate::rate`, потому что только она тестируется ЛОКАЛЬНО за 0.03 с:
+//!       rustc --test --edition 2021 src/rate.rs -o /tmp/rate && /tmp/rate
+//!   Здесь остаётся код, для которого нужен grammers-tl-types 0.12.0 с
+//!   `edition = "2024"` (Cargo ≥ 1.85), а в песочнице rustc/cargo 1.83 ⇒
+//!   проверка только через CI. Это разделение сокращает CI-раунды в разы.
+//!
+//! Все формы вызовов ниже сверены с vendor-исходниками (не с доками и не с памятью):
 //!
 //!   client.messages.rs:903  delete_messages<C: Into<PeerRef>>(peer, &[i32]) -> Result<usize, _>
 //!                           «Deletes up to 100 messages… the amount of deleted messages is
 //!                            returned (it might be less than the amount of input IDs if some
-//!                            were already missing)» ⇒ пакет ≤ 100, счёт — от сервера.
+//!                            were already missing)» ⇒ пакет ≤ 100, счёт — ОТ СЕРВЕРА.
 //!   client.messages.rs:877  warning: для малых групп и ЛС Telegram НЕ проверяет, что id
 //!                           принадлежат этому peer ⇒ движок обязан держать правильный peer
 //!                           сам (это же причина, почему избранное охраняется реестром).
@@ -20,18 +23,23 @@
 //!   message.message.rs:305  Message::sender(&self) -> Option<&Peer>
 //!   media/media.rs:883      impl Downloadable for Media  (download_media(&D, path))
 //!   media/input_media.rs:356 InputMedia::copy_media(&Media) — зеркальный ответ
+//!   client/updates.rs:31    UpdateStream::next(&mut) -> Result<Update, InvocationError>
 //!   client/updates.rs:69    stream_updates(mpsc::Receiver<UpdatesLike>, UpdatesConfiguration)
-//!                           → UpdateStream::next() -> Result<Update, InvocationError>;
+//!                           → Result<UpdateStream, Box<dyn Error + Send + Sync>>;
 //!                           док: «peers must have been persisted in the session cache
 //!                           beforehand… use iter_dialogs at least once after login»
 //!                           ⇒ seed_dialogs() ОБЯЗАТЕЛЕН до live-цикла.
-//!   errors.rs (mtsender)    InvocationError::Rpc(RpcError{code:420,value:Some(sec)})
-//!                           ⇒ FLOOD_WAIT ретраится только нами: retry_policy не объявлен.
+//!   errors.rs (mtsender):186 InvocationError { Session, Rpc, Io, Deserialize, Transport,
+//!                           Dropped(&'static str) } — док Dropped: «may mean that the
+//!                           SenderPoolRunner is no longer running… contents should not
+//!                           be matched on», поэтому сверяем ТОЛЬКО вариант enum.
+//!   configuration.rs:198    AutoSleep{tries=1, threshold=60s}: FLOOD_WAIT ≤ 60 с
+//!                           ретраится библиотекой один раз, длиннее приходит к нам.
 
 #![allow(dead_code)]
 
 use std::collections::HashSet;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use grammers_client::session::types::PeerRef;
 use grammers_client::update::Update;
@@ -40,163 +48,15 @@ use grammers_mtsender::{InvocationError, UpdatesConfiguration};
 use tokio::sync::mpsc;
 
 use crate::caps::flood_seconds;
+// Чистая логика доступна и отсюда ПУБЛИЧНО: `purge_batch` принимает `&mut Registry`
+// и возвращает `Result<_, Refusal>`, поэтому вызывающий слой обязан уметь назвать
+// эти типы, не зная про внутреннее устройство модуля rate.
+pub use crate::rate::{guard_saved, plan_batches, Registry, Refusal, BATCH_MAX};
 
-/// Максимальный размер пакета удаления. Telegram документирует «up to 100»,
-/// берём 50 как в Python-версии: меньше шанс поймать FLOOD_WAIT на одном пакете
-/// и всё ещё один RTT (~191 мс медиана) на 50 сообщений.
-pub const BATCH_MAX: usize = 50;
+// Чистая логика доступна и отсюда, чтобы вызывающий слой не менялся при выносе
+// в `rate` (и чтобы регресс «модуль написан, но не подключён» ловился обоими путями).
+pub use crate::rate::{GLOBAL_RATE_PER_MIN, Window};
 
-/// Глобальный потолок отправок в минуту для ответок (защита аккаунта).
-pub const GLOBAL_RATE_PER_MIN: usize = 12;
-
-// ──────────────────────────────────────────────────────────── скользящее окно
-/// Скользящее окно частоты. Чистая функция времени: история — моменты прошлых
-/// отправок, никаких таймеров и глобального состояния, поэтому тестируется без сна.
-#[derive(Debug, Clone)]
-pub struct Window {
-    limit: usize,
-    span: Duration,
-    hits: Vec<Instant>,
-}
-
-impl Window {
-    pub fn new(limit: usize, span: Duration) -> Self {
-        Self { limit, span, hits: Vec::new() }
-    }
-
-    /// Сколько ждать до следующей разрешённой отправки. 0 = можно сейчас.
-    /// limit = 0 означает «без потолка» (юзер вправе поставить 0 осознанно).
-    pub fn wait(&self, now: Instant) -> Duration {
-        if self.limit == 0 {
-            return Duration::ZERO;
-        }
-        let cutoff = now.checked_sub(self.span).unwrap_or(now);
-        let in_win: Vec<Instant> = self.hits.iter().copied().filter(|t| *t > cutoff).collect();
-        if in_win.len() < self.limit {
-            return Duration::ZERO;
-        }
-        // самое старое из окно-выживших освободится через span
-        let oldest = in_win[in_win.len() - self.limit];
-        let free_at = oldest + self.span;
-        if free_at <= now { Duration::ZERO } else { free_at - now }
-    }
-
-    pub fn allow(&self, now: Instant) -> bool {
-        self.wait(now).is_zero()
-    }
-
-    pub fn record(&mut self, now: Instant) {
-        self.hits.push(now);
-        self.hits.sort_by(|a, b| b.cmp(a)); // новые первыми
-        let cutoff = now.checked_sub(self.span).unwrap_or(now);
-        self.hits.retain(|t| *t > cutoff);
-        if self.hits.len() > self.limit.max(1) * 4 {
-            self.hits.truncate(self.limit.max(1) * 4);
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.hits.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.hits.is_empty()
-    }
-}
-
-// ─────────────────────────────────────────────────── реестр «создано движком»
-/// Единственное основание удалить сообщение из ЛС с самим собой (Saved Messages /
-/// избранное). Правило юзера 25.11: «удалять что-то избранное, присланное мной,
-/// запрещено; только то, что ты написал».
-///
-/// Реестр обязан переживать рестарт процесса (в Python-версии это U-D30: сироты
-/// 201157/201164 остались неудаляемыми, пока хранились только в RAM), поэтому
-/// здесь он — только память, а сохранение в state делает вызывающий слой
-/// (`crate::store::FileSession` + `Session::cache_peer`-подобный путь).
-#[derive(Debug, Default, Clone)]
-pub struct Registry {
-    own: HashSet<i32>,
-}
-
-impl Registry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn own(&mut self, id: i32) {
-        self.own.insert(id);
-        if self.own.len() > 500 {
-            // детерминированного порядка у HashSet нет, поэтому хвост режем по
-            // возрастанию id: старые сообщения теряются первыми, новые (актуальные) — нет
-            let mut v: Vec<i32> = self.own.iter().copied().collect();
-            v.sort_unstable();
-            let keep = &v[v.len() - 300..];
-            self.own = keep.iter().copied().collect();
-        }
-    }
-
-    pub fn forget(&mut self, ids: &[i32]) {
-        for i in ids {
-            self.own.remove(i);
-        }
-    }
-
-    pub fn contains(&self, id: i32) -> bool {
-        self.own.contains(&id)
-    }
-
-    pub fn len(&self) -> usize {
-        self.own.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.own.is_empty()
-    }
-
-    pub fn ids(&self) -> Vec<i32> {
-        let mut v: Vec<i32> = self.own.iter().copied().collect();
-        v.sort_unstable();
-        v
-    }
-}
-
-/// Причина отказа удаления. `None` = удалять можно.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Refusal {
-    /// Сообщение в ЛС с самим собой, но его не создавал движок → избранное юзера.
-    SavedForeign(Vec<i32>),
-    /// Пустой пакет.
-    Empty,
-}
-
-/// ★ Единая точка решения «можно ли удалять». Вызывается ДО любого сетевого вызова.
-///
-/// `is_self_chat` = чат является Saved Messages (cid == me_id). Вне его гард не
-/// действует: там цель определяется списком targets, и «чьё это» не важно
-/// (слова юзера: «без разницы, наше или чужое»).
-pub fn guard_saved(is_self_chat: bool, reg: &Registry, ids: &[i32]) -> Option<Refusal> {
-    if ids.is_empty() {
-        return Some(Refusal::Empty);
-    }
-    if !is_self_chat {
-        return None;
-    }
-    let foreign: Vec<i32> = ids.iter().copied().filter(|i| !reg.contains(*i)).collect();
-    if foreign.is_empty() {
-        None
-    } else {
-        // отказ ЦЕЛИКОМ: половинчатое удаление в избранном — риск снести нужное юзеру
-        Some(Refusal::SavedForeign(foreign))
-    }
-}
-
-/// Разбивает id на пакеты не длиннее `BATCH_MAX` (один RTT на пакет).
-pub fn plan_batches(ids: &[i32], size: usize) -> Vec<Vec<i32>> {
-    let size = size.max(1).min(BATCH_MAX);
-    ids.chunks(size).map(|c| c.to_vec()).collect()
-}
-
-// ─────────────────────────────────────────────────────────────── боевой путь
 /// Удалить пакет, если гард разрешает. Возвращает число реально удалённых
 /// (сервер отдаёт count, messages.rs:885) либо причину отказа.
 pub async fn purge_batch(
@@ -230,6 +90,7 @@ pub async fn seed_dialogs(client: &Client) -> Result<usize, InvocationError> {
     Ok(total)
 }
 
+/// Основной live-цикл. Возвращает число удалённых сообщений, когда пул остановки.
 pub async fn run_stream(
     client: Client,
     updates: mpsc::Receiver<grammers_session::updates::UpdatesLike>,
@@ -246,12 +107,11 @@ pub async fn run_stream(
         let upd = match stream.next().await {
             Ok(u) => u,
             Err(e) => {
-                // ★ Dropped = пул больше не работает (sender_pool.rs: «may mean that the
-                //   SenderPoolRunner is no longer running»). Строковое содержимое
-                //   сопоставлять нельзя (говорит док errors.rs:224-226), поэтому только
-                //   вариант enum. Это ЕДИНСТВЕННЫЙ выход из цикла со счётчиком: раньше
-                //   `removed` был «assigned but never used» (warning раунда 11), потому
-                //   что цикл не имел условия выхода — то есть счёт удалённого терялся.
+                // ★ Dropped = пул больше не работает. Строковое содержимое сопоставлять
+                //   нельзя (док errors.rs:224-226), поэтому только вариант enum.
+                //   Это ЕДИНСТВЕННЫЙ выход из цикла со счётчиком: без него `removed`
+                //   был «assigned but never used» (warning раунда 11) — то есть число
+                //   удалённого терялось навсегда.
                 if matches!(e, InvocationError::Dropped(_)) {
                     return Ok(removed);
                 }
@@ -303,151 +163,19 @@ pub async fn run_stream(
     }
 }
 
-// ────────────────────────────────────────────────────────────────── тесты
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn at(base: Instant, secs: u64) -> Instant {
-        base + Duration::from_secs(secs)
+/// Пакетное удаление всей пачки id с гардом (путь для sweep-задач, не live).
+pub async fn purge_all(
+    client: &Client,
+    peer: PeerRef,
+    is_self_chat: bool,
+    reg: &mut Registry,
+    ids: &[i32],
+) -> Result<usize, Refusal> {
+    let mut total = 0usize;
+    for batch in plan_batches(ids, BATCH_MAX) {
+        total += purge_batch(client, peer.clone(), is_self_chat, reg, &batch).await?;
+        // пауза между пакетами: один RTT ~191 мс медиана, дешевле ждать, чем ловить FLOOD_WAIT
+        tokio::time::sleep(Duration::from_millis(400)).await;
     }
-
-    // ---- Window ----
-    #[test]
-    fn window_allows_until_limit() {
-        let t0 = Instant::now();
-        let mut w = Window::new(2, Duration::from_secs(60));
-        assert!(w.allow(t0));
-        w.record(t0);
-        assert!(w.allow(at(t0, 1)));
-        w.record(at(t0, 1));
-        assert!(!w.allow(at(t0, 2)), "третий за минуту упирается в потолок");
-    }
-
-    #[test]
-    fn window_waits_exactly_span_from_oldest() {
-        let t0 = Instant::now();
-        let mut w = Window::new(2, Duration::from_secs(60));
-        w.record(at(t0, 0));
-        w.record(at(t0, 10));
-        let wait = w.wait(at(t0, 20));
-        assert_eq!(wait, Duration::from_secs(40), "освободится на t0+60");
-        assert!(w.allow(at(t0, 61)));
-    }
-
-    #[test]
-    fn window_limit_zero_means_unlimited() {
-        // 0 — осознанное «без потолка». Старое `or DEFAULT` превращало 0 в 12.
-        let t0 = Instant::now();
-        let mut w = Window::new(0, Duration::from_secs(60));
-        for i in 0..50 {
-            assert!(w.allow(at(t0, i)), "потолка нет: {i}");
-            w.record(at(t0, i));
-        }
-    }
-
-    #[test]
-    fn window_forgets_old_hits() {
-        let t0 = Instant::now();
-        let mut w = Window::new(1, Duration::from_secs(10));
-        w.record(t0);
-        assert!(!w.allow(at(t0, 5)));
-        assert!(w.allow(at(t0, 11)));
-        w.record(at(t0, 11));
-        assert_eq!(w.len(), 1, "старые должны вылететь из окна");
-    }
-
-    // ---- Registry ----
-    #[test]
-    fn registry_remembers_only_marked() {
-        let mut r = Registry::new();
-        r.own(10);
-        r.own(20);
-        assert!(r.contains(10));
-        assert!(!r.contains(11));
-        r.forget(&[10]);
-        assert!(!r.contains(10));
-        assert_eq!(r.ids(), vec![20]);
-    }
-
-    #[test]
-    fn registry_is_bounded() {
-        let mut r = Registry::new();
-        for i in 0..600 {
-            r.own(i);
-        }
-        assert!(r.len() <= 500, "реестр разросся: {}", r.len());
-        assert!(r.contains(599), "свежие id обязаны оставаться");
-    }
-
-    // ---- guard_saved ----
-    #[test]
-    fn guard_refuses_foreign_in_saved_messages() {
-        let r = Registry::new();
-        match guard_saved(true, &r, &[1, 2]) {
-            Some(Refusal::SavedForeign(v)) => assert_eq!(v, vec![1, 2]),
-            other => panic!("ожидался отказ, получили {other:?}"),
-        }
-    }
-
-    #[test]
-    fn guard_allows_own_in_saved_messages() {
-        let mut r = Registry::new();
-        r.own(1);
-        r.own(2);
-        assert_eq!(guard_saved(true, &r, &[1, 2]), None);
-    }
-
-    #[test]
-    fn guard_refuses_whole_mixed_batch() {
-        let mut r = Registry::new();
-        r.own(1);
-        match guard_saved(true, &r, &[1, 2]) {
-            Some(Refusal::SavedForeign(v)) => assert_eq!(v, vec![2]),
-            other => panic!("ожидался отказ целиком, получили {other:?}"),
-        }
-    }
-
-    #[test]
-    fn guard_inactive_outside_saved_messages() {
-        let r = Registry::new();
-        assert_eq!(guard_saved(false, &r, &[1, 2, 3]), None,
-                   "в обычном чате цель определяется списком targets, а не реестром");
-    }
-
-    #[test]
-    fn guard_empty_batch_refused() {
-        let r = Registry::new();
-        assert_eq!(guard_saved(false, &r, &[]), Some(Refusal::Empty));
-    }
-
-    // ---- plan_batches ----
-    #[test]
-    fn batches_split_and_capped() {
-        let ids: Vec<i32> = (1..=120).collect();
-        let b = plan_batches(&ids, 50);
-        assert_eq!(b.len(), 3);
-        assert_eq!(b[0].len(), 50);
-        assert_eq!(b[2].len(), 20);
-        assert!(b.iter().all(|x| x.len() <= BATCH_MAX));
-    }
-
-    #[test]
-    fn batch_size_zero_becomes_one() {
-        let b = plan_batches(&[1, 2, 3], 0);
-        assert_eq!(b.len(), 3, "0 → 1, иначе бесконечный цикл");
-    }
-
-    #[test]
-    fn batch_size_above_cap_is_clamped() {
-        let ids: Vec<i32> = (1..=200).collect();
-        let b = plan_batches(&ids, 10_000);
-        assert!(b.iter().all(|x| x.len() <= BATCH_MAX),
-                "Telegram документирует «up to 100» — выше нельзя");
-    }
-
-    #[test]
-    fn empty_input_gives_no_batches() {
-        assert!(plan_batches(&[], 50).is_empty());
-    }
+    Ok(total)
 }

@@ -2,14 +2,14 @@
    Compiling unicode-ident v1.0.27
    Compiling quote v1.0.47
    Compiling typenum v1.20.1
-   Compiling hybrid-array v0.4.15
    Compiling crc32fast v1.5.6
-   Compiling libc v0.2.191
+   Compiling hybrid-array v0.4.15
    Compiling cmov v0.5.4
-   Compiling block-buffer v0.12.1
-   Compiling crypto-common v0.2.2
-   Compiling autocfg v1.5.1
+   Compiling libc v0.2.191
    Compiling ctutils v0.4.8
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling autocfg v1.5.1
    Compiling cfg-if v1.0.5
    Compiling num-traits v0.2.19
    Compiling syn v3.0.10
@@ -18,39 +18,39 @@
    Compiling digest v0.11.3
    Compiling grammers-tl-parser v2.0.0
    Compiling ident_case v1.0.1
-   Compiling serde_core v1.0.229
    Compiling cpubits v0.1.1
+   Compiling serde_core v1.0.229
    Compiling strsim v0.11.1
    Compiling grammers-tl-gen v0.12.0
    Compiling inout v0.2.6
-   Compiling cpufeatures v0.3.1
    Compiling getrandom v0.4.3
-   Compiling thiserror v2.0.21
    Compiling pin-project-lite v0.2.18
+   Compiling thiserror v2.0.21
+   Compiling cpufeatures v0.3.1
    Compiling cipher v0.5.2
    Compiling grammers-tl-types v0.12.0
    Compiling crypto-bigint v0.7.11
    Compiling num-integer v0.1.47
-   Compiling syn v2.0.119
    Compiling darling_core v0.24.1
    Compiling thiserror-impl v2.0.21
+   Compiling syn v2.0.119
    Compiling once_cell v1.21.4
    Compiling cfg_aliases v0.2.2
    Compiling nix v0.31.4
-   Compiling tracing-core v0.1.36
    Compiling darling_macro v0.24.1
-   Compiling tracing-attributes v0.1.31
+   Compiling tracing-core v0.1.36
    Compiling darling v0.24.1
    Compiling crypto-primes v0.7.2
    Compiling num-bigint v0.5.1
    Compiling hmac v0.13.0
-   Compiling simd-adler32 v0.3.10
-   Compiling serde v1.0.229
    Compiling adler2 v2.0.1
+   Compiling serde v1.0.229
+   Compiling simd-adler32 v0.3.10
+   Compiling tracing-attributes v0.1.31
    Compiling miniz_oxide v0.9.1
-   Compiling glass_pumpkin v2.0.0
-   Compiling pbkdf2 v0.13.0
    Compiling tracing v0.1.44
+   Compiling pbkdf2 v0.13.0
+   Compiling glass_pumpkin v2.0.0
    Compiling serde_with_macros v3.25.0
    Compiling serde_derive v1.0.229
    Compiling aes v0.9.4
@@ -58,11 +58,10 @@
    Compiling sha1 v0.11.0
    Compiling sha2 v0.11.2
    Compiling bitflags v2.13.2
-   Compiling unicase v2.10.0
    Compiling hex v0.4.3
-   Compiling log v0.4.35
-   Compiling serde_with v3.25.0
+   Compiling unicase v2.10.0
    Compiling mime_guess v2.0.5
+   Compiling serde_with v3.25.0
    Compiling grammers-crypto v0.12.0
    Compiling flate2 v1.1.11
    Compiling tokio-macros v2.7.2
@@ -70,69 +69,24 @@
    Compiling socket2 v0.6.5
    Compiling bytes v1.12.2
    Compiling zmij v1.0.23
+   Compiling log v0.4.35
    Compiling os_info v3.15.0
    Compiling tokio v1.54.1
-   Compiling serde_json v1.0.154
-   Compiling futures-core v0.3.34
-   Compiling slab v0.4.12
-   Compiling locate-locale v0.2.0
-   Compiling jiff-core v0.1.8
    Compiling futures-task v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling jiff-core v0.1.8
+   Compiling locate-locale v0.2.0
+   Compiling slab v0.4.12
    Compiling mime v0.3.18
+   Compiling serde_json v1.0.154
    Compiling jiff v0.2.46
    Compiling futures-util v0.3.34
-   Compiling md5 v0.8.1
    Compiling memchr v2.8.3
-   Compiling httpdate v1.0.3
-   Compiling chunked_transfer v1.5.0
-   Compiling ascii v1.1.0
    Compiling itoa v1.0.19
-   Compiling tiny_http v0.12.0
+   Compiling md5 v0.8.1
    Compiling grammers-session v0.12.0
    Compiling grammers-mtproto v0.12.0
    Compiling grammers-mtsender v0.12.0
    Compiling grammers-client v0.12.0
    Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
-warning: unused import: `PeerId`
-  --> src/engine.rs:36:39
-   |
-36 | use grammers_client::session::types::{PeerId, PeerRef};
-   |                                       ^^^^^^
-   |
-   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
-warning: unused import: `std::collections::HashMap`
-  --> src/store.rs:34:5
-   |
-34 | use std::collections::HashMap;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: variable `removed` is assigned to, but never used
-   --> src/engine.rs:244:9
-    |
-244 |     let mut removed = 0u64;
-    |         ^^^^^^^^^^^
-    |
-    = note: consider using `_removed` instead
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-warning: value assigned to `removed` is never read
-   --> src/engine.rs:284:22
-    |
-284 |             Ok(n) => removed += n as u64,
-    |                      ^^^^^^^^^^^^^^^^^^^
-    |
-    = help: maybe it is overwritten before being read?
-    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
-
-warning: `purge` (lib) generated 4 warnings (run `cargo fix --lib -p purge` to apply 2 suggestions)
-warning: unused dependency `tiny_http`
-  --> Cargo.toml:38:1
-   |
-38 | tiny_http = "0.12"
-   | ^^^^^^^^^^^^^^^^^^
-   |
-   = note: `cargo::unused_dependencies` is set to `warn` by default
-help: consider removing the dependency on `tiny_http`
-warning: `purge` (manifest) generated 1 warning
-    Finished `release` profile [optimized] target(s) in 50.61s
+    Finished `release` profile [optimized] target(s) in 1m 01s

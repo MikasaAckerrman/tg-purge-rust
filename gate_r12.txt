@@ -4,3 +4,55 @@ ok: скобки сбалансированы
 ok красный: YAML ПЛОХО: сломанный канал: cargo tree --depth 1 2>&1 | head -20
 ok зелёный: CARGO OK: симметрия (7 объявлено, алиасов: 1, собственные имена: ['purge'])
 === 2) push ===
+push exit=0 HEAD=179dd51
+=== 3) ждём CI ===
+run_id=45670995044
+=== 4) вердикт ===
+run_id=45670995044
+state: completed / failure
+
+JOB android: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   OK   8 сборка под Android arm64-v8a
+   OK   9 проверить артефакты
+   OK  10 Run actions/upload-artifact@v4
+   skip 11 сохранить логи на провал
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+JOB host: completed / failure
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 сборка релиза (lib cdylib + bin)
+   FAIL 6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK   9 сохранить логи на провал
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+артефакты: 2
+  host-logs: 4439 Б → /var/minis/shared/rustspike/logs_pull/host-logs
+
+--- build.log: 92 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Compiling grammers-session v0.12.0
+       Compiling grammers-mtproto v0.12.0
+       Compiling grammers-mtsender v0.12.0
+       Compiling grammers-client v0.12.0
+       Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+        Finished `release` profile [optimized] target(s) in 1m 01s
+
+--- test.log: 146 строк, 1 ошибок
+    error: test failed, to rerun pass `--lib`
+   ---
+  purge-android-arm64: 426411 Б → /var/minis/shared/rustspike/logs_pull/purge-android-arm64
+R12_DONE

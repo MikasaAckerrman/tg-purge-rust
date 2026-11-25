@@ -8,6 +8,7 @@
 """
 import os
 import re
+import subprocess
 import sys
 import tomllib
 
@@ -146,6 +147,39 @@ else:
                             print(f"YAML ПЛОХО: сломанный канал: {line.strip()[:80]}")
                             ok = False
     print("YAML OK: jobs =", list(jobs.keys()))
+
+# ---- чистая логика: локальный прогон тестов БЕЗ CI (главная экономия раунда 13) ----
+# rate.rs зависит только от std ⇒ rustc 1.83 его компилирует и тестирует за 0.03 с.
+# Если это сломать, CI-прогон вообще не нужен: падаем здесь.
+rate_src = f"{ROOT}/src/rate.rs"
+if os.path.exists(rate_src):
+    with open(rate_src, encoding="utf-8") as fh:
+        rate_raw = fh.read()
+    # ★ Проверяем по КОДУ, а не по файлу: в doc-заголовке rate.rs намеренно упомянут
+    #   grammers-tl-types (объяснение, зачем модуль вынесен), и наивная проверка
+    #   `"grammers" in rate_src` ловила бы собственный комментарий.
+    if "grammers" in braces2.blanks(rate_raw):
+        print("RATE ПЛОХО: rate.rs обязан быть без зависимостей от grammers — иначе теряет смысл локальный прогон")
+        ok = False
+    p = subprocess.run(["rustc", "--test", "--edition", "2021", rate_src,
+                        "-o", "/tmp/rate_local_test"],
+                       capture_output=True, text=True)
+    if p.returncode != 0:
+        print("RATE ПЛОХО: rustc не собрал тесты")
+        print((p.stderr or p.stdout)[:1500])
+        ok = False
+    else:
+        r = subprocess.run(["/tmp/rate_local_test"], capture_output=True, text=True)
+        tail = (r.stdout or "").strip().splitlines()[-1:] or ["(нет вывода)"]
+        if r.returncode != 0:
+            print("RATE ПЛОХО: юнит-тесты чистой логики упали")
+            print("\n".join((r.stdout or "").splitlines()[-40:])[:2000])
+            ok = False
+        else:
+            print(f"RATE OK: локальные тесты rate.rs — {tail[0]}")
+else:
+    print("RATE ПЛОХО: нет src/rate.rs (чистая логика обязана быть локально тестируемой)")
+    ok = False
 
 # ---- Rust-исходники: честный баланс скобок (строки/комментарии не в счёт) ----
 # Наивный `src.count('{')` давал ЛОЖНЫЕ срабатывания: в store.rs есть
