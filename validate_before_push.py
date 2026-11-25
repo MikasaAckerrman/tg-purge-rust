@@ -37,12 +37,45 @@ else:
     print(f"CARGO OK: package {pkg.get('name')} v{pkg.get('version')} edition={pkg.get('edition')}")
 
 deps = man.get("dependencies", {})
-need = ["grammers-client", "grammers-session", "grammers-mtsender", "grammers-tl-types",
-        "tokio", "serde", "serde_json", "tiny_http"]
-for d in need:
-    if d not in deps:
-        print(f"CARGO ПЛОХО: зависимость {d} не объявлена")
-        ok = False
+# ★ Список зависимостей НЕ хардкодим (жёсткий список устаревает и сам вводит в заблуждение:
+#   он уже однажды требовал tiny_http после того, как я её вынес). Проверяем СИММЕТРИЮ:
+#   объявленное — используется, используемое — объявлено. Это ловит оба класса ошибок:
+#   «unused dependency» (раунд 11: cargo warn'инг на tiny_http) и «не объявлен» (E0432).
+deps_us = {d.replace("-", "_") for d in deps}
+all_code = ""
+for f in sorted(os.listdir(f"{ROOT}/src")):
+    if f.endswith(".rs"):
+        with open(f"{ROOT}/src/{f}", encoding="utf-8") as fh:
+            all_code += braces2.blanks(fh.read()) + "\n"
+
+RESERVED = {"std", "core", "crate", "self", "super"}
+# `use X as Y;` — X используется через алиас Y, поэтому ищем и алиасы.
+# (grammers_tl_types в caps.rs объявлен именно как `use grammers_tl_types as tl;` —
+#  без этого проверка давала ЛОЖНОЕ «не используется».)
+alias_pairs = re.findall(r"^\s*use\s+([a-z_][a-z0-9_]*)\s+as\s+([a-z_][a-z0-9_]*)\s*;",
+                         all_code, re.M)
+aliases = {a: c for c, a in alias_pairs}
+aliased_crates = {c for c, _ in alias_pairs}
+
+# имя собственного lib-крета — не зависимость (main.rs делает `use purge::caps;`)
+own_names = {man["package"]["name"].replace("-", "_")}
+lib_name = (man.get("lib") or {}).get("name")
+if lib_name:
+    own_names.add(lib_name.replace("-", "_"))
+
+for d in sorted(deps_us):
+    if re.search(rf"\b{re.escape(d)}::", all_code) or d in aliased_crates:
+        continue
+    print(f"CARGO ПЛОХО: зависимость {d} объявлена, но в коде не используется "
+          f"(cargo даёт unused-dependency; лишний вес в .so)")
+    ok = False
+
+used_first = set(re.findall(r"^\s*use\s+([a-z_][a-z0-9_]*)::", all_code, re.M))
+for u in sorted(used_first - RESERVED - deps_us - own_names - set(aliases)):
+    print(f"CARGO ПЛОХО: код использует {u}::, но такой зависимости нет в Cargo.toml")
+    ok = False
+print(f"CARGO OK: симметрия ({len(deps_us)} объявлено, алиасов: {len(aliases)}, "
+      f"собственные имена: {sorted(own_names)})")
 sess = deps.get("grammers-session", {})
 if isinstance(sess, dict):
     feats = sess.get("features") or []

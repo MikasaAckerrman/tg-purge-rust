@@ -58,6 +58,17 @@ mod tests {
     }
 
     #[test]
+    fn engine_modules_are_wired() {
+        // Регресс на «модуль написан, но не подключён»: без этого lib компилируется,
+        // а юнит-тесты engine не запускаются вообще (так я уже терял init-баг U-D29).
+        let mut reg = crate::engine::Registry::new();
+        reg.own(1);
+        assert_eq!(crate::engine::guard_saved(true, &reg, &[1]), None);
+        assert!(crate::engine::guard_saved(true, &reg, &[2]).is_some());
+        assert_eq!(crate::engine::plan_batches(&[1, 2, 3], 2).len(), 2);
+    }
+
+    #[test]
     fn session_format_version_matches_store() {
         assert_eq!(SESSION_FORMAT, FormatVersion::current().0);
         assert!(FormatVersion(FORMAT_VERSION).is_compatible());

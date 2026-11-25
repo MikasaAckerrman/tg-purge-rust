@@ -31,7 +31,6 @@
 
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -328,8 +327,14 @@ mod tests {
             &path,
             r#"{"version":999,"home_dc":1,"dc_options":[],"peers":[],"updates_state":{"pts":0,"qts":0,"date":0,"seq":0,"channels":[]}}"#,
         ).unwrap();
-        let e = FileSession::open(&path).unwrap_err();
-        assert!(e.to_string().contains("формат сессии"), "файл чужой версии принят: {e}");
+        // ★ НЕ `.unwrap_err()`: у `Result::unwrap_err` bound `T: Debug`, а T здесь —
+        //   FileSession (внутри Mutex<SessionData>, Debug у SessionData не выведен).
+        //   Раунд 11 упал именно на этом: error[E0277] `FileSession` doesn't implement Debug.
+        let e = match FileSession::open(&path) {
+            Ok(_) => panic!("файл чужой версии принят — молча читать чужую схему нельзя"),
+            Err(e) => e,
+        };
+        assert!(e.to_string().contains("формат сессии"), "не та ошибка: {e}");
     }
 
     #[test]

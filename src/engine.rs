@@ -33,7 +33,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use grammers_client::session::types::{PeerId, PeerRef};
+use grammers_client::session::types::PeerRef;
 use grammers_client::update::Update;
 use grammers_client::Client;
 use grammers_mtsender::{InvocationError, UpdatesConfiguration};
@@ -246,6 +246,15 @@ pub async fn run_stream(
         let upd = match stream.next().await {
             Ok(u) => u,
             Err(e) => {
+                // ★ Dropped = пул больше не работает (sender_pool.rs: «may mean that the
+                //   SenderPoolRunner is no longer running»). Строковое содержимое
+                //   сопоставлять нельзя (говорит док errors.rs:224-226), поэтому только
+                //   вариант enum. Это ЕДИНСТВЕННЫЙ выход из цикла со счётчиком: раньше
+                //   `removed` был «assigned but never used» (warning раунда 11), потому
+                //   что цикл не имел условия выхода — то есть счёт удалённого терялся.
+                if matches!(e, InvocationError::Dropped(_)) {
+                    return Ok(removed);
+                }
                 if let Some(sec) = flood_seconds(&e) {
                     tokio::time::sleep(Duration::from_secs(sec + 1)).await;
                     continue;

@@ -3,3 +3,14 @@ vendor/
 *.session
 code.txt
 Cargo.lock
+
+# Логи CI и скачанные артефакты — это РАБОЧИЕ материалы, а не продукт репозитория:
+# они пересоздаются каждым прогоном pull_logs.py и только шумят в git status
+# (раунд 11: 8 строк «D logs_pull/...» в диффе). Скрипт их читает, git — нет.
+logs_pull/
+logs/
+logs7/
+logs8/
+logs9/
+logs10/
+*.zip

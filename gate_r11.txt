@@ -4,3 +4,65 @@ ok: скобки сбалансированы во всех src/*.rs
 ok красный: YAML ПЛОХО: сломанный канал: cargo tree --depth 1 2>&1 | head -20
 ok зелёный
 === 2) push ===
+push exit=0 HEAD=7e691ef
+=== 3) ждём CI ===
+run_id=45661780960
+=== 4) вердикт из pull_logs.py ===
+run_id=45661780960
+state: completed / failure
+
+JOB android: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   OK   8 сборка под Android arm64-v8a
+   OK   9 проверить артефакты
+   OK  10 Run actions/upload-artifact@v4
+   skip 11 сохранить логи на провал
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+JOB host: completed / failure
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 сборка релиза (lib cdylib + bin)
+   FAIL 6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK   9 сохранить логи на провал
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+артефакты: 2
+  purge-android-arm64: 426218 Б → /var/minis/shared/rustspike/logs_pull/purge-android-arm64
+  host-logs: 5112 Б → /var/minis/shared/rustspike/logs_pull/host-logs
+
+--- build.log: 138 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       | ^^^^^^^^^^^^^^^^^^
+       |
+       = note: `cargo::unused_dependencies` is set to `warn` by default
+    help: consider removing the dependency on `tiny_http`
+    warning: `purge` (manifest) generated 1 warning
+        Finished `release` profile [optimized] target(s) in 50.61s
+
+--- test.log: 147 строк, 2 ошибок
+    error[E0277]: `store::FileSession` doesn't implement `Debug`
+       --> src/store.rs:331:42
+        |
+    331 |         let e = FileSession::open(&path).unwrap_err();
+        |                                          ^^^^^^^^^^ unsatisfied trait bound
+        |
+    help: the trait `Debug` is not implemented for `store::FileSession`
+   ---
+    error: could not compile `purge` (lib test) due to 1 previous error; 4 warnings emitted
+    warning: build failed, waiting for other jobs to finish...
+    warning: `purge` (lib) generated 4 warnings (run `cargo fix --lib -p purge` to apply 2 suggestions)
+   ---
+R11_DONE

@@ -64,6 +64,23 @@
 
 ## 3. Гейты (ни один не пропускается; каждый = отдельный CI-прогон с числом)
 
+**Хроника гейта R1 (раунды 6–11, все падения — мои догадки, не библиотека):**
+| раунд | HEAD | итог | что упало |
+|---|---|---|---|
+| 1 | 3c9e2fc | — | `cargo \| tail` маскировал провал (pipe-код = код хвоста) |
+| 2 | 2da5d29 | 0 jobs, 3 с | двоеточие в некавированном `name:` → YAML не разобрался |
+| 3 | d871087 | 0 jobs | `Cargo.toml` без `[package]` |
+| 4 | d24804d | step exit 101 | `cargo tree \| head -20` + pipefail → cargo паникует на Broken pipe; `setup-android@v3` упал; `cargo test --release` несовместим с `panic="abort"` |
+| 6 | 1c52cf9 | lib: **23 ошибки** | догадки о типах grammers |
+| 7 | 9bab85f | lib: **11 ошибок** | имена вариантов TL, `limit()` потребляет, пинна версии cargo-ndk |
+| 8 | 8ef217c | lib: **5 ошибок** | unit-варианты (enums.rs:73-77) |
+| 9 | 090de07 | lib: **1 ошибка** | `InputChatPhoto::InputChatUploadedPhoto` (префикс не режется) |
+| 10 | 0ba8fea | **lib COMPILED** ✅, bin: 4 ошибки | `println!("-".repeat(..))` (не литерал), borrow `rows` после move |
+| 11 | (в работе) | engine.rs + правки main.rs | — |
+
+★ **cargo-ndk v4.1.2 реально ставится и NDK r27 ставится** (шаги 5–7 android зелёные в раунде 10),
+значит путь «Rust-движок внутри APK» технически существует — это уже не предположение.
+
 * **R1 — сборка.** `cargo build --release` для `x86_64-unknown-linux-gnu` (тесты)
   и `cargo ndk -t arm64-v8a build --release` (APK). Ворота: оба зелёные, .so на
   Android ≠ 0 байт, `nm` показывает `JNI_OnLoad` (если cdylib) или бинарь собирается.
@@ -181,6 +198,59 @@ APK tg.purge (Kotlin, ~200 строк, только оболочка)
 4. Логи шагов пишем в файл и печатаем хвост только после успеха (`|| { tail -80 log; exit 1; }`).
 
 ## 9. Что известно о grammers 0.12.0 ЖЕЛЕЗНО (исходники в `vendor/`, не доки)
+
+* ★ **ИСПРАВЛЕНО МОЁ ЛОЖНОЕ УТВЕРЖДЕНИЕ (раунд 10, чтение mtsender, а не догадка):**
+  политики повторных попыток РЕАЛЬНО есть и используются — но не в клиенте, а в
+  `grammers-mtsender/src/configuration.rs`: `lib.rs:33` экспортирует
+  `{RetryPolicy, NoRetries, AutoSleep}`, `configuration.rs:123` —
+  `impl Default for ConnectionParams` ставит `AutoSleep::default()`,
+  `configuration.rs:198` — `AutoSleep { tries: NonZeroU32::MIN (=1), threshold: 60 s,
+  io_errors_as_flood_of: Some(1 s) }`. Мёртв только файл
+  `grammers-client/src/client/retry_policy.rs` (`mod retry_policy;` нигде нет).
+  Практический вывод: FLOOD_WAIT ≤ 60 с ретраится ОДИН раз библиотекой, всё длиннее —
+  приходит нам как ошибка, и паузу ставит движок.
+* `delete_messages<C: Into<PeerRef>>(peer, &[i32]) -> Result<usize, InvocationError>` —
+  док (messages.rs:873-888): «Deletes up to 100 messages… the amount of deleted messages
+  is returned (it might be less than the amount of input message IDs if some were already
+  missing)» ⇒ пакет ≤ 100, счёт — ОТ СЕРВЕРА (в Python это лечилось U-D31).
+  Warning там же: для малых групп и ЛС Telegram **не проверяет** принадлежность id peer.
+* `Message::delete(&self) -> Result<(), _>` (message.rs:759) — «Shorthand for
+  Client::delete_messages», безопасный путь для одиночного id.
+* `Message::reply<M: Into<InputMessage>>(&self, M) -> Result<Self, _>` (message.rs:689),
+  `Message::forward_to<C: Into<PeerRef>>(&self, chat) -> Result<Self, _>` (:724),
+  `Message::media(&self) -> Option<Media>` (:446), `Message::sender(&self) -> Option<&Peer>` (:305).
+* `InputMedia::copy_media(&Media)` (input_media.rs:356) — зеркальный ответ «тем же стикером»
+  без перекачивания байтов; `InputMedia::stickers(Option<Vec<InputDocument>>)` (:620).
+  `impl Downloadable for Media` (media.rs:883), `download_media<D: Downloadable, P: AsRef<Path>>`
+  (files.rs:212), `upload_file<P: AsRef<Path>> -> Result<Uploaded, io::Error>` (:500),
+  `Uploaded { pub raw: tl::enums::InputFile }` (media.rs:40).
+* Апдейты: `client.stream_updates(mpsc::Receiver<UpdatesLike>, UpdatesConfiguration)
+  -> Result<UpdateStream, Box<dyn Error + Send + Sync>>` (updates.rs:69),
+  `UpdateStream::next(&mut) -> Result<Update, InvocationError>`;
+  `UpdatesConfiguration { pub catch_up: bool }` — **без Default**, форма из echo.rs:81;
+  `UpdatesLike` реэкспортируется `grammers_session::updates` (updates.rs:13).
+  Док: до stream обязаны быть закэшированы peers («use iter_dialogs at least once after login»).
+* `SenderPool::new(Arc<S>, i32) -> SenderPool {runner, handle: SenderPoolFatHandle, updates}`
+  с `S: Session + Sized, S::Error: std::error::Error + Send + Sync + 'static`;
+  `SenderPoolRunner::run(mut self)` (sender_pool.rs:297); `Client::new(SenderPoolFatHandle)`
+  ПОТРЕБЛЯЕТ handle (net.rs:49) ⇒ клонировать.
+* Оформление в LAYER 233: `channels.editTitle#566decd0 channel:InputChannel`,
+  `channels.editPhoto#f12e57c9 channel:InputChannel photo:InputChatPhoto`,
+  `messages.editChatAbout#def60797 peer:InputPeer`, `messages.editChatTitle#73783ffd chat_id:long`,
+  `inputChannel#f35aec28{channel_id,access_hash}`, `inputChannelEmpty#ee8c1e86`,
+  `inputChatUploadedPhoto#bdcdaec0{file,video,video_start_ts,video_emoji_markup}`,
+  `inputFileBig#fa4f0bb5`, `inputStickerSetShortName#861cc8a0`.
+* ★ **Провал гейта R3 (единственный, подтверждён дважды):** `channels.editDescription`
+  в слое 233 ОТСУТСТВУЕТ (grep по имени → 0, по ID `f8b0a74e` → 0). Описание супергруппы:
+  git-master (layer 234, коммит 24.11.2026) / TDLib JSON / остаётся на Python-движке.
+* Именование TL (rustifier.rs:92-122 + enums.rs:73-77): префикс типа режется только при
+  `starts_with`; иначе вариант = ПОЛНОЕ имя (`inputChatUploadedPhoto` →
+  `InputChatPhoto::InputChatUploadedPhoto`, НЕ `Uploaded`); `inputPeerSelf` → `PeerSelf`;
+  конструкторы без параметров → **unit-варианты без структур**; структуры без namespace
+  лежат прямо в `tl::types::X`.
+* Методика: **отсутствие** доказываем только grep'ом по исходникам/`api.tl` и ID
+  конструктора. `strings` по `.so` доказывает лишь наличие (на этом я чуть не
+  похоронил TDLib wrongly: `sendChatMessage` не нашёлся строками, хотя метод есть).
 
 * Нет модуля `types`: `Message` в `grammers_client::message`, пиры в `grammers_client::peer`,
   сессии в `grammers_client::session` (`pub use grammers_session as session`).

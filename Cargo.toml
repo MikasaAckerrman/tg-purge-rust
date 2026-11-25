@@ -35,7 +35,9 @@ grammers-tl-types = { version = "0.12.0", default-features = false }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "io-util", "net", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tiny_http = "0.12"
+# tiny_http УБРАН (раунд 11: warning `unused dependency`): HTTP-слой — фаза Ф-R5,
+# держать мёртвую зависимость в графе = лишний вес .so и ложное ощущение готовности.
+# Вернём её в Ф-R5 вместе с кодом сервера, а не заранее.
 
 [profile.release]
 opt-level = 3
