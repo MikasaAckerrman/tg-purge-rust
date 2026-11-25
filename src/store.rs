@@ -174,8 +174,11 @@ impl Session for FileSession {
     }
 
     fn set_dc_option(&self, dc_option: &DcOption) -> BoxFuture<'_, Result<(), Self::Error>> {
+        // ★ Клони ДО async move: иначе будущий блок заимствует аргумент функции,
+        // а трейт требует 'self (раунд 6: «method was supposed to return data
+        // with lifetime '2 but it is returning data with lifetime '1»).
+        let dc = dc_option.clone();
         Box::pin(async move {
-            let dc = dc_option.clone();
             self.lock()?.dc_options.insert(dc.id, dc);
             self.mark_dirty();
             Ok(())
@@ -267,7 +270,8 @@ mod tests {
             block(s.set_home_dc_id(2)).unwrap();
             block(s.cache_peer(PeerInfo::User {
                 id: 5804685716,
-                auth: grammers_session::types::PeerAuth::from_hash(12345678901234),
+                // ★ auth: Option<PeerAuth> (peer.rs:81), поэтому Some(...)
+                auth: Some(grammers_session::types::PeerAuth::from_hash(12345678901234)),
                 bot: Some(false),
                 is_self: Some(true),
             }))

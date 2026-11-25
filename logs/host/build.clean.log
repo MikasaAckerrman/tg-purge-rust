@@ -1,0 +1,505 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling hybrid-array v0.4.15
+   Compiling crc32fast v1.5.6
+   Compiling cmov v0.5.4
+   Compiling libc v0.2.191
+   Compiling ctutils v0.4.8
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling autocfg v1.5.1
+   Compiling cfg-if v1.0.5
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.10
+   Compiling const-oid v0.10.3
+   Compiling rand_core v0.10.1
+   Compiling digest v0.11.3
+   Compiling grammers-tl-parser v2.0.0
+   Compiling serde_core v1.0.229
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling cpubits v0.1.1
+   Compiling grammers-tl-gen v0.12.0
+   Compiling inout v0.2.6
+   Compiling getrandom v0.4.3
+   Compiling pin-project-lite v0.2.18
+   Compiling thiserror v2.0.21
+   Compiling cpufeatures v0.3.1
+   Compiling cipher v0.5.2
+   Compiling grammers-tl-types v0.12.0
+   Compiling crypto-bigint v0.7.11
+   Compiling num-integer v0.1.47
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.21
+   Compiling syn v2.0.119
+   Compiling once_cell v1.21.4
+   Compiling cfg_aliases v0.2.2
+   Compiling nix v0.31.4
+   Compiling darling_macro v0.24.1
+   Compiling tracing-core v0.1.36
+   Compiling darling v0.24.1
+   Compiling crypto-primes v0.7.2
+   Compiling num-bigint v0.5.1
+   Compiling hmac v0.13.0
+   Compiling adler2 v2.0.1
+   Compiling serde v1.0.229
+   Compiling simd-adler32 v0.3.10
+   Compiling miniz_oxide v0.9.1
+   Compiling tracing-attributes v0.1.31
+   Compiling tracing v0.1.44
+   Compiling pbkdf2 v0.13.0
+   Compiling glass_pumpkin v2.0.0
+   Compiling serde_with_macros v3.25.0
+   Compiling serde_derive v1.0.229
+   Compiling aes v0.9.4
+   Compiling ctr v0.10.1
+   Compiling sha1 v0.11.0
+   Compiling sha2 v0.11.2
+   Compiling unicase v2.10.0
+   Compiling hex v0.4.3
+   Compiling log v0.4.35
+   Compiling bitflags v2.13.2
+   Compiling serde_with v3.25.0
+   Compiling mime_guess v2.0.5
+   Compiling grammers-crypto v0.12.0
+   Compiling flate2 v1.1.11
+   Compiling tokio-macros v2.7.2
+   Compiling mio v1.2.5
+   Compiling socket2 v0.6.5
+   Compiling bytes v1.12.2
+   Compiling zmij v1.0.23
+   Compiling tokio v1.54.1
+   Compiling os_info v3.15.0
+   Compiling locate-locale v0.2.0
+   Compiling jiff-core v0.1.8
+   Compiling slab v0.4.12
+   Compiling mime v0.3.18
+   Compiling serde_json v1.0.154
+   Compiling futures-task v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling jiff v0.2.46
+   Compiling chunked_transfer v1.5.0
+   Compiling itoa v1.0.19
+   Compiling ascii v1.1.0
+   Compiling md5 v0.8.1
+   Compiling memchr v2.8.3
+   Compiling httpdate v1.0.3
+   Compiling tiny_http v0.12.0
+   Compiling grammers-mtproto v0.12.0
+   Compiling grammers-session v0.12.0
+   Compiling grammers-mtsender v0.12.0
+   Compiling grammers-client v0.12.0
+   Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+error[E0432]: unresolved import `store::FormatVersion`
+  --> src/lib.rs:18:30
+   |
+18 | pub use store::{FileSession, FormatVersion, FORMAT_VERSION, StoreError};
+   |                              ^^^^^^^^^^^^^ no `FormatVersion` in `store`
+
+error[E0422]: cannot find struct, variant or union type `InputFileUploaded` in module `tl::types`
+   --> src/caps.rs:167:62
+    |
+167 |         file: Some(tl::enums::InputFile::Uploaded(tl::types::InputFileUploaded {
+    |                                                              ^^^^^^^^^^^^^^^^^ not found in `tl::types`
+
+warning: unused import: `Dialog`
+  --> src/caps.rs:45:29
+   |
+45 | use grammers_client::peer::{Dialog, Peer, User};
+   |                             ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `PeerInfo`
+  --> src/caps.rs:46:47
+   |
+46 | use grammers_client::session::types::{PeerId, PeerInfo};
+   |                                               ^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/store.rs:34:5
+   |
+34 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `PeerRef: From<PeerId>` is not satisfied
+    --> src/caps.rs:90:41
+     |
+  90 |     let mut hist = client.iter_messages(peer_id_peer());
+     |                           ------------- ^^^^^^^^^^^^^^ the trait `From<PeerId>` is not implemented for `PeerRef`
+     |                           |
+     |                           required by a bound introduced by this call
+     |
+     = help: `PeerRef` implements trait `From<T>`:
+               From<&ChatEmpty>
+               From<&ChatForbidden>
+               From<&InputPeer>
+               From<&InputPeerChannel>
+               From<&InputPeerChannelFromMessage>
+               From<&InputPeerChat>
+               From<&InputPeerSelf>
+               From<&InputPeerUser>
+             and 28 others
+     = note: required for `PeerId` to implement `Into<PeerRef>`
+note: required by a bound in `client::messages::<impl Client>::iter_messages`
+    --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/messages.rs:1081:29
+     |
+ 568 | impl Client {
+...
+1081 |     pub fn iter_messages<C: Into<PeerRef>>(&self, peer: C) -> MessageIter {
+     |                             ^^^^^^^^^^^^^ required by this bound in `client::messages::<impl Client>::iter_messages`
+
+error[E0277]: the trait bound `PeerRef: From<&PeerId>` is not satisfied
+   --> src/caps.rs:100:43
+    |
+100 |     let _parts = client.iter_participants(&p).total().await;
+    |                         ----------------- ^^ the trait `From<&PeerId>` is not implemented for `PeerRef`
+    |                         |
+    |                         required by a bound introduced by this call
+    |
+    = help: `PeerRef` implements trait `From<T>`:
+              From<&ChatEmpty>
+              From<&ChatForbidden>
+              From<&InputPeer>
+              From<&InputPeerChannel>
+              From<&InputPeerChannelFromMessage>
+              From<&InputPeerChat>
+              From<&InputPeerSelf>
+              From<&InputPeerUser>
+            and 28 others
+    = note: required for `&PeerId` to implement `Into<PeerRef>`
+note: required by a bound in `client::chats::<impl Client>::iter_participants`
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/chats.rs:450:33
+    |
+367 | impl Client {
+...
+450 |     pub fn iter_participants<C: Into<PeerRef>>(&self, chat: C) -> ParticipantIter {
+    |                                 ^^^^^^^^^^^^^ required by this bound in `client::chats::<impl Client>::iter_participants`
+
+error[E0277]: the trait bound `PeerRef: From<&PeerId>` is not satisfied
+   --> src/caps.rs:101:41
+    |
+101 |     let _perms = client.get_permissions(&p).await;
+    |                         --------------- ^^ the trait `From<&PeerId>` is not implemented for `PeerRef`
+    |                         |
+    |                         required by a bound introduced by this call
+    |
+    = help: `PeerRef` implements trait `From<T>`:
+              From<&ChatEmpty>
+              From<&ChatForbidden>
+              From<&InputPeer>
+              From<&InputPeerChannel>
+              From<&InputPeerChannelFromMessage>
+              From<&InputPeerChat>
+              From<&InputPeerSelf>
+              From<&InputPeerUser>
+            and 28 others
+    = note: required for `&PeerId` to implement `Into<PeerRef>`
+note: required by a bound in `client::chats::<impl Client>::get_permissions`
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/chats.rs:686:37
+    |
+367 | impl Client {
+...
+686 |     pub async fn get_permissions<C: Into<PeerRef>, U: Into<PeerRef>>(
+    |                                     ^^^^^^^^^^^^^ required by this bound in `client::chats::<impl Client>::get_permissions`
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/caps.rs:101:25
+    |
+101 |     let _perms = client.get_permissions(&p).await;
+    |                         ^^^^^^^^^^^^^^^---- argument #2 is missing
+    |
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/chats.rs:686:18
+    |
+686 |     pub async fn get_permissions<C: Into<PeerRef>, U: Into<PeerRef>>(
+    |                  ^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+101 |     let _perms = client.get_permissions(&p, /* user */).await;
+    |                                           ++++++++++++
+
+error[E0277]: the trait bound `PeerRef: From<&PeerId>` is not satisfied
+   --> src/caps.rs:101:18
+    |
+101 |     let _perms = client.get_permissions(&p).await;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `From<&PeerId>` is not implemented for `PeerRef`
+    |
+    = help: `PeerRef` implements trait `From<T>`:
+              From<&ChatEmpty>
+              From<&ChatForbidden>
+              From<&InputPeer>
+              From<&InputPeerChannel>
+              From<&InputPeerChannelFromMessage>
+              From<&InputPeerChat>
+              From<&InputPeerSelf>
+              From<&InputPeerUser>
+            and 28 others
+    = note: required for `&PeerId` to implement `Into<PeerRef>`
+note: required by a bound in `client::chats::<impl Client>::get_permissions`
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/chats.rs:686:37
+    |
+367 | impl Client {
+...
+686 |     pub async fn get_permissions<C: Into<PeerRef>, U: Into<PeerRef>>(
+    |                                     ^^^^^^^^^^^^^ required by this bound in `client::chats::<impl Client>::get_permissions`
+
+error[E0277]: the trait bound `PeerRef: From<&PeerId>` is not satisfied
+   --> src/caps.rs:101:45
+    |
+101 |     let _perms = client.get_permissions(&p).await;
+    |                                             ^^^^^ the trait `From<&PeerId>` is not implemented for `PeerRef`
+    |
+    = help: `PeerRef` implements trait `From<T>`:
+              From<&ChatEmpty>
+              From<&ChatForbidden>
+              From<&InputPeer>
+              From<&InputPeerChannel>
+              From<&InputPeerChannelFromMessage>
+              From<&InputPeerChat>
+              From<&InputPeerSelf>
+              From<&InputPeerUser>
+            and 28 others
+    = note: required for `&PeerId` to implement `Into<PeerRef>`
+note: required by a bound in `client::chats::<impl Client>::get_permissions`
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/chats.rs:686:37
+    |
+367 | impl Client {
+...
+686 |     pub async fn get_permissions<C: Into<PeerRef>, U: Into<PeerRef>>(
+    |                                     ^^^^^^^^^^^^^ required by this bound in `client::chats::<impl Client>::get_permissions`
+
+error[E0560]: struct `EditTitle` has no field named `chat_id`
+   --> src/caps.rs:153:13
+    |
+153 |             chat_id,
+    |             ^^^^^^^ `EditTitle` does not have this field
+    |
+    = note: available fields are: `channel`
+
+error[E0308]: mismatched types
+   --> src/caps.rs:152:17
+    |
+152 |           .invoke(tl::functions::channels::EditTitle {
+    |  __________------_^
+    | |          |
+    | |          arguments to this method are incorrect
+153 | |             chat_id,
+154 | |             title: String::new(),
+155 | |         })
+    | |_________^ expected `&_`, found `EditTitle`
+    |
+    = note: expected reference `&_`
+                  found struct `EditTitle`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+152 |         .invoke(&tl::functions::channels::EditTitle {
+    |                 +
+
+error[E0560]: struct `EditPhoto` has no field named `chat_id`
+   --> src/caps.rs:160:13
+    |
+160 |             chat_id,
+    |             ^^^^^^^ `EditPhoto` does not have this field
+    |
+    = note: available fields are: `channel`
+
+error[E0308]: mismatched types
+   --> src/caps.rs:159:17
+    |
+159 |           .invoke(tl::functions::channels::EditPhoto {
+    |  __________------_^
+    | |          |
+    | |          arguments to this method are incorrect
+160 | |             chat_id,
+161 | |             photo: tl::enums::InputChatPhoto::Empty,
+162 | |         })
+    | |_________^ expected `&_`, found `EditPhoto`
+    |
+    = note: expected reference `&_`
+                  found struct `EditPhoto`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+159 |         .invoke(&tl::functions::channels::EditPhoto {
+    |                 +
+
+error[E0599]: no variant, associated function, or constant named `Uploaded` found for enum `grammers_tl_types::enums::InputChatPhoto` in the current scope
+   --> src/caps.rs:166:44
+    |
+166 |     let photo = tl::enums::InputChatPhoto::Uploaded(tl::types::InputChatUploadedPhoto {
+    |                                            ^^^^^^^^ variant, associated function, or constant not found in `grammers_tl_types::enums::InputChatPhoto`
+
+error[E0599]: no variant, associated function, or constant named `Uploaded` found for enum `grammers_tl_types::enums::InputFile` in the current scope
+   --> src/caps.rs:167:42
+    |
+167 |         file: Some(tl::enums::InputFile::Uploaded(tl::types::InputFileUploaded {
+    |                                          ^^^^^^^^ variant, associated function, or constant not found in `grammers_tl_types::enums::InputFile`
+
+error[E0277]: the trait bound `grammers_tl_types::types::InputChatUploadedPhoto: std::default::Default` is not satisfied
+   --> src/caps.rs:173:11
+    |
+173 |         ..Default::default()
+    |           ^^^^^^^^^^^^^^^^^^ the trait `std::default::Default` is not implemented for `grammers_tl_types::types::InputChatUploadedPhoto`
+
+error[E0560]: struct `EditPhoto` has no field named `chat_id`
+   --> src/caps.rs:176:54
+    |
+176 |         .invoke(tl::functions::channels::EditPhoto { chat_id, photo })
+    |                                                      ^^^^^^^ `EditPhoto` does not have this field
+    |
+    = note: available fields are: `channel`
+
+error[E0308]: mismatched types
+   --> src/caps.rs:176:17
+    |
+176 |         .invoke(tl::functions::channels::EditPhoto { chat_id, photo })
+    |          ------ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&_`, found `EditPhoto`
+    |          |
+    |          arguments to this method are incorrect
+    |
+    = note: expected reference `&_`
+                  found struct `EditPhoto`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+176 |         .invoke(&tl::functions::channels::EditPhoto { chat_id, photo })
+    |                 +
+
+error[E0560]: struct `EditChatAbout` has no field named `chat_id`
+   --> src/caps.rs:181:13
+    |
+181 |             chat_id,
+    |             ^^^^^^^ `EditChatAbout` does not have this field
+    |
+    = note: available fields are: `peer`
+
+error[E0308]: mismatched types
+   --> src/caps.rs:180:17
+    |
+180 |           .invoke(tl::functions::messages::EditChatAbout {
+    |  __________------_^
+    | |          |
+    | |          arguments to this method are incorrect
+181 | |             chat_id,
+182 | |             about: String::new(),
+183 | |         })
+    | |_________^ expected `&_`, found `EditChatAbout`
+    |
+    = note: expected reference `&_`
+                  found struct `EditChatAbout`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+180 |         .invoke(&tl::functions::messages::EditChatAbout {
+    |                 +
+
+error[E0308]: mismatched types
+   --> src/caps.rs:204:17
+    |
+204 |           .invoke(tl::functions::messages::GetStickers {
+    |  __________------_^
+    | |          |
+    | |          arguments to this method are incorrect
+205 | |             emoticon: String::new(),
+206 | |             hash: 0,
+207 | |         })
+    | |_________^ expected `&_`, found `GetStickers`
+    |
+    = note: expected reference `&_`
+                  found struct `GetStickers`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+204 |         .invoke(&tl::functions::messages::GetStickers {
+    |                 +
+
+error[E0308]: mismatched types
+   --> src/caps.rs:211:17
+    |
+211 |           .invoke(tl::functions::messages::GetStickerSet {
+    |  __________------_^
+    | |          |
+    | |          arguments to this method are incorrect
+212 | |             stickerset: tl::enums::InputStickerSet::ShortName(tl::types::InputStickerSetShortName {
+213 | |                 short_name: String::new(),
+214 | |             }),
+215 | |             hash: 0,
+216 | |         })
+    | |_________^ expected `&_`, found `GetStickerSet`
+    |
+    = note: expected reference `&_`
+                  found struct `GetStickerSet`
+note: method defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/client/net.rs:91:18
+    |
+ 91 |     pub async fn invoke<R: tl::RemoteCall>(
+    |                  ^^^^^^
+help: consider borrowing here
+    |
+211 |         .invoke(&tl::functions::messages::GetStickerSet {
+    |                 +
+
+error[E0308]: mismatched types
+   --> src/caps.rs:229:30
+    |
+229 |     match Update::NewMessage(msg) {
+    |           ------------------ ^^^ expected `grammers_client::update::Message`, found `grammers_client::message::Message`
+    |           |
+    |           arguments to this enum variant are incorrect
+    |
+note: tuple variant defined here
+   --> /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/grammers-client-0.12.0/src/update/update.rs:25:5
+    |
+ 25 |     NewMessage(Message),
+    |     ^^^^^^^^^^
+
+error: lifetime may not live long enough
+   --> src/store.rs:177:9
+    |
+176 |       fn set_dc_option(&self, dc_option: &DcOption) -> BoxFuture<'_, Result<(), Self::Error>> {
+    |                        -                 - let's call the lifetime of this reference `'1`
+    |                        |
+    |                        let's call the lifetime of this reference `'2`
+177 | /         Box::pin(async move {
+178 | |             let dc = dc_option.clone();
+179 | |             self.lock()?.dc_options.insert(dc.id, dc);
+180 | |             self.mark_dirty();
+181 | |             Ok(())
+182 | |         })
+    | |__________^ method was supposed to return data with lifetime `'2` but it is returning data with lifetime `'1`
+    |
+help: consider introducing a named lifetime parameter and update trait if needed
+    |
+176 -     fn set_dc_option(&self, dc_option: &DcOption) -> BoxFuture<'_, Result<(), Self::Error>> {
+176 +     fn set_dc_option<'a>(&self, dc_option: &'a DcOption) -> BoxFuture<'a, Result<(), Self::Error>> {
+    |
+
+Some errors have detailed explanations: E0061, E0277, E0308, E0422, E0432, E0560, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `purge` (lib) generated 3 warnings
+error: could not compile `purge` (lib) due to 23 previous errors; 3 warnings emitted

@@ -15,7 +15,7 @@ pub mod auth;
 pub mod caps;
 pub mod store;
 
-pub use store::{FileSession, FormatVersion, FORMAT_VERSION, StoreError};
+pub use store::{FileSession, FORMAT_VERSION, StoreError};
 
 /// Версия формата сессии на диске. Наружу отдаём числом, чтобы тест и CLI
 /// сверяли одно и то же.

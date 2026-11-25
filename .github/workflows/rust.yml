@@ -126,6 +126,9 @@ jobs:
           mv -f "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
 
+      # Раунд 6: путь к NDK был ЗАХАРдкожен (ndk/27.0.12077973), а sdkmanager
+      # кладёт пакет по своему имени — проверка `test -d` упала и шаг умер
+      # ДО загрузки бинарей. Теперь каталог ищется по факту установки.
       - name: "NDK r27"
         run: |
           set -o pipefail
@@ -138,13 +141,25 @@ jobs:
             sed -n '1,80p' ndk.log
             exit 1
           fi
-          NDK="$ANDROID_HOME/ndk/27.0.12077973"
-          test -d "$NDK" || { echo "::error::нет каталога $NDK"; ls "$ANDROID_HOME/ndk" 2>&1 || true; exit 1; }
+          echo "=== что реально установлено в \$ANDROID_HOME/ndk ==="
+          ls -1 "$ANDROID_HOME/ndk" > ndkdirs.txt 2>&1 || true
+          cat ndkdirs.txt
+          NDK="$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | head -1)"
+          if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+            echo "::error::каталог NDK не найден после установки"
+            sed -n '1,40p' ndk.log 2>/dev/null || true
+            exit 1
+          fi
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-config" --version 2>/dev/null || true
-          ls "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" > bins.txt 2>&1
-          grep -E "aarch64-linux-android(21|24|33)?clang(\.py)?$" bins.txt || {
-            echo "::error::в NDK нет aarch64-clang"; sed -n '1,40p' bins.txt; exit 1; }
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          ls -1 "$BIN" > bins.txt 2>&1 || true
+          echo "=== бинарей в NDK: $(wc -l < bins.txt) ==="
+          if ! grep -q "aarch64-linux-android24-clang" bins.txt; then
+            echo "::error::в NDK нет aarch64-linux-android24-clang"
+            head -40 bins.txt
+            exit 1
+          fi
+          grep "aarch64-linux-android" bins.txt | sed -n '1,6p'
 
       - name: "cargo-ndk"
         run: |

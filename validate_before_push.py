@@ -144,6 +144,26 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if re.search(r"\bSenderHandle\b", code):
         print(f"src/{f}: SenderHandle не существует — в 0.12.0 SenderPoolHandle/SenderPoolFatHandle")
         ok = False
+    # TL-типы и формы вызовов, на которых раунд 6 дал 23 ошибки компилятора
+    if "InputFileUploaded" in code:
+        print(f"src/{f}: InputFileUploaded НЕ существует — есть inputFile/inputFileBig")
+        ok = False
+    if re.search(r"channels::(EditTitle|EditPhoto)\s*\{\s*chat_id", code):
+        print(f"src/{f}: channels::Edit* принимает channel: InputChannel, не chat_id")
+        ok = False
+    if re.search(r"invoke\(tl::functions", code):
+        print(f"src/{f}: invoke требует ссылку — invoke(&req), не invoke(req)")
+        ok = False
+    if re.search(r"tl::types::(InputChatUploadedPhoto|InputChatPhotoEmpty|InputStickerSetShortName|InputFileBig|InputChannel|InputPeerSelf)\b", code):
+        print(f"src/{f}: TL-типы во вложенных модулях (tl::types::input_chat_uploaded_photo::…), "
+              f"не прямо в tl::types")
+        ok = False
+    if re.search(r"get_permissions\([^,()]+\)\s*\.await", code):
+        print(f"src/{f}: get_permissions(chat, user) — ДВА аргумента (chats.rs:686)")
+        ok = False
+    if re.search(r"iter_messages\(PeerId::", code) or re.search(r"iter_participants\(&", code):
+        print(f"src/{f}: From<PeerId> для PeerRef нет — только PeerId::to_ambient_ref()")
+        ok = False
     if re.search(r"if let Ok\(msg\) = item", code):
         print(f"src/{f}: итератор отдаёт Result<Option<T>,_>, а не Result<Result<T,_>,_> — "
               f"такой паттерн тихо теряет все сообщения")

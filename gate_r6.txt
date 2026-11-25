@@ -15,3 +15,49 @@ src/store.rs: 14898 байт, скобки в коде сбалансирова�
 
 ИТОГ: ГОТОВО К ПУШУ
 === 4) push ===
+push exit=0 HEAD=1c52cf9
+=== 5) ждём CI и читаем вердикт ===
+run_id=45646654288
+state: completed / failure | created 2026-11-25T15:34:18Z
+jobs: 2
+
+JOB android: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   OK    5 Android cmdline-tools (без сторонних экшенов)
+   FAIL  6 NDK r27
+   skip  7 cargo-ndk
+   skip  8 сборка под Android arm64-v8a
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK   11 сохранить логи на провал
+   OK   22 Post Run actions/checkout@v4
+   OK   23 Complete job
+
+JOB host: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   FAIL  5 сборка релиза (lib cdylib + bin)
+   skip  6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK    9 сохранить логи на провал
+   OK   18 Post Run actions/checkout@v4
+   OK   19 Complete job
+
+=== 6) АННОТАЦИИ: теперь там полный лог компилятора (::error::) ===
+--- job 139319354723 ---
+  [failure] .github:162
+      Process completed with exit code 1.
+  [failure] .github:121
+      в NDK нет aarch64-clang
+--- job 139319355319 ---
+  [failure] .github:138
+      Process completed with exit code 1.
+  [failure] .github:17
+      СБОРКА УПАЛА — полный лог ниже
+R6_DONE
