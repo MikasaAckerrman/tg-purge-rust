@@ -1,0 +1,2 @@
+[1m[92m    Updating[0m crates.io index
+[1m[91merror[0m: could not find `cargo-ndk` in registry `crates-io` with version `=3.0.6`

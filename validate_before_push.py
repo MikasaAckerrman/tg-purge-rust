@@ -154,10 +154,26 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if re.search(r"invoke\(tl::functions", code):
         print(f"src/{f}: invoke требует ссылку — invoke(&req), не invoke(req)")
         ok = False
-    if re.search(r"tl::types::(InputChatUploadedPhoto|InputChatPhotoEmpty|InputStickerSetShortName|InputFileBig|InputChannel|InputPeerSelf)\b", code):
-        print(f"src/{f}: TL-типы во вложенных модулях (tl::types::input_chat_uploaded_photo::…), "
-              f"не прямо в tl::types")
+    if re.search(r"tl::types::(input_[a-z_]+::|input_file::)", code) or "InputPeer::Self_" in code:
+        print(f"src/{f}: TL-пути/имена: конструкторы без точки → tl::types::<Type>, "
+              f"inputPeerSelf → InputPeer::PeerSelf (не Self_)")
         ok = False
+    # раунд 7: имена вариантов (rustifier.rs:92-122)
+    if re.search(r"InputChannel::InputChannel\b", code):
+        print(f"src/{f}: inputChannel → InputChannel::Channel, не ::InputChannel")
+        ok = False
+    if re.search(r"InputFile::InputFile\b|InputChatPhoto::InputChatPhoto\b", code):
+        print(f"src/{f}: префикс типа у варианта отрезается (InputFile::File / InputChatPhoto::…)")
+        ok = False
+    # раунд 7: limit(mut self) -> Self потребляет итератор (E0382)
+    for line in code.splitlines():
+        s = line.strip()
+        if ".limit(" in s and s.startswith("let _") :
+            print(f"src/{f}: .limit() потребляет итератор — нельзя в `let _ = …`: {s[:80]}")
+            ok = False
+        if re.search(r"^\w+\.limit\(.+\)\.(total|next)", s):
+            print(f"src/{f}: цепочка `x.limit(..).total()` после использования x — E0382: {s[:80]}")
+            ok = False
     if re.search(r"get_permissions\([^,()]+\)\s*\.await", code):
         print(f"src/{f}: get_permissions(chat, user) — ДВА аргумента (chats.rs:686)")
         ok = False

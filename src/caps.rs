@@ -43,6 +43,24 @@
 //!   inputPeerSelf#7da07ec9                                                          = InputPeer
 //!   inputStickerSetShortName#861cc8a0 short_name:string                           = InputStickerSet
 //!   ★ `inputFileUploaded` НЕ существует (раунд 6: E0422) — есть inputFile/inputFileBig.
+//!   ★ ИМЕНА ВАРИАНТОВ (rustifier.rs:92-122, проверено по его же тестам):
+//!     от имени конструктора отрезается префикс типа; «Self» → вторая с конца
+//!     заглавная буква; всё-цифровое → последняя заглавная. Практика:
+//!       inputPeerSelf            → InputPeer::PeerSelf        (тест check_def_self_variant_name)
+//!       inputChannel             → InputChannel::Channel      (пустой суффикс → всё имя)
+//!       inputChannelEmpty        → InputChannel::Empty
+//!       inputChatPhotoEmpty      → InputChatPhoto::Empty
+//!       inputChatUploadedPhoto   → InputChatPhoto::Uploaded
+//!       inputFileBig             → InputFile::Big
+//!       inputStickerSetShortName → InputStickerSet::ShortName
+//!     Структуры — прямо в `tl::types::X` (вложенный модуль ТОЛЬКО у namespaced
+//!     конструкторов вида `upload.fileCdnRedirect = upload.File`).
+//!     (rustifier.rs: check_def_qual_name "userEmpty = User" → "crate::types::UserEmpty");
+//!     вложенный модуль — только у namespaced ("upload.fileCdnRedirect = upload.File"
+//!     → "crate::types::upload::FileCdnRedirect").
+//!   ★ вариант `inputPeerSelf` именуется **InputPeer::PeerSelf**, не Self_
+//!     (check_def_self_variant_name), а атрибут `self:flags.0?true` → `is_self`
+//!     (check_param_self_attr_name); зарезервированные слова → `r#final`.
 //!   ★ `channels.editDescription` в слое 233 НЕ существует — провал гейта №1.
 //!
 //! Провалы гейта, найденные ДО боевого кода (это и есть цель спайка):
@@ -98,9 +116,12 @@ async fn read_surface(client: &Client) {
         let _pid: PeerId = peer.id();
         let _raw: i64 = peer.id().bare_id_unchecked();
         let _name: Option<&str> = peer.name();
-        let chat: PeerRef = dialog.peer_ref();
+        // ★ НЕ dialog.peer_ref(): внутри он делает `self.peer.auth().unwrap()`
+        // (peer/dialog.rs:85) и ПАНИКУЕТ, если authority ещё не известен.
+        // to_ambient_ref() отдаёт PeerAuth::default() — безопасно, пусть и без хэша.
+        let chat: PeerRef = peer.id().to_ambient_ref();
         if me_ref.is_none() {
-            me_ref = Some(chat.clone());
+            me_ref = Some(chat);
         }
     }
 
@@ -110,15 +131,17 @@ async fn read_surface(client: &Client) {
     let _resolved = client.resolve_username("we_erti").await;
 
     if let Some(chat) = me_ref {
-        let mut hist = client.iter_messages(chat.clone());
-        let _n: usize = hist.limit(200).total().await.unwrap_or(0);
+        // ★ limit(mut self) -> Self ПОТРЕБЛЯЕТ итератор (client/messages.rs:301),
+        // поэтому переприсваиваем, а не зовём hist.limit(200).total() (раунд 7: E0382).
+        let mut hist = client.iter_messages(chat).limit(200);
+        let _n: usize = hist.total().await.unwrap_or(0);
         while let Some(msg) = hist.next().await.unwrap_or(None) {
             let _id: i32 = msg.id();
             let _out: bool = msg.outgoing();
             let _text: &str = msg.text();
             let _peer = msg.peer_id();
         }
-        let _parts = client.iter_participants(chat.clone()).total().await;
+        let _parts = client.iter_participants(chat).total().await;
         // ★ get_permissions принимает ДВА аргумента: chat и user (chats.rs:686)
         let _perms = client.get_permissions(chat, myself).await;
     }
@@ -157,7 +180,7 @@ pub fn flood_seconds(err: &InvocationError) -> Option<u64> {
 /// ★ `invoke` принимает ЗАПРОС ПО ССЫЛКЕ (net.rs:91), поэтому держим локальную переменную.
 /// ★ Поле называется `channel: InputChannel`, а не `chat_id` (раунд 6: E0560).
 async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) {
-    let channel = tl::enums::InputChannel::InputChannel(tl::types::input_channel::InputChannel {
+    let channel = tl::enums::InputChannel::Channel(tl::types::InputChannel {
         channel_id,
         access_hash,
     });
@@ -170,14 +193,19 @@ async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) 
 
     let clear = tl::functions::channels::EditPhoto {
         channel: channel.clone(),
-        photo: tl::enums::InputChatPhoto::Empty(tl::types::input_chat_photo::InputChatPhotoEmpty),
+        // inputChatPhotoEmpty#1ca48f57 = InputChatPhoto → вариант `Empty`
+        photo: tl::enums::InputChatPhoto::Empty(tl::types::InputChatPhotoEmpty),
     };
     let _ = client.invoke(&clear).await;
 
     // uploaded-эталон: inputChatUploadedPhoto#bdcdaec0 flags:# file:flags.0?InputFile …
     // ★ struct НЕ выводит Default (раунд 6: E0277) — все четыре поля названы явно.
-    let photo = tl::enums::InputChatPhoto::Uploaded(tl::types::input_chat_uploaded_photo::InputChatUploadedPhoto {
-        file: Some(tl::enums::InputFile::Big(tl::types::input_file::input_file_big::InputFileBig {
+    // ★ Имена путей: конструкторы БЕЗ точки в TL дают `tl::types::<Type>` напрямую
+    //   (check_def_qual_name: "userEmpty = User" → "crate::types::UserEmpty");
+    //   вложенный модуль появляется только у namespaced-конструкторов
+    //   ("upload.fileCdnRedirect = upload.File" → "crate::types::upload::FileCdnRedirect").
+    let photo = tl::enums::InputChatPhoto::Uploaded(tl::types::InputChatUploadedPhoto {
+        file: Some(tl::enums::InputFile::Big(tl::types::InputFileBig {
             id: 0,
             parts: 0,
             name: String::new(),
@@ -190,7 +218,11 @@ async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) 
     let _ = client.invoke(&up).await;
 
     // описание БАЗОВОЙ группы: messages.editChatAbout#def60797 peer:InputPeer about:string
-    let peer = tl::enums::InputPeer::Self_(tl::types::input_peer::input_peer_self::InputPeerSelf);
+    // ★ вариант зовётся `PeerSelf`, НЕ `Self_`: генератор для конструктора
+    //   inputPeerSelf возвращает variant "Self", который заменяется на имя из
+    //   предпоследней заглавной буквы (rustifier.rs:96-107, тест
+    //   check_def_self_variant_name: "inputPeerSelf = InputPeer" → "PeerSelf").
+    let peer = tl::enums::InputPeer::PeerSelf(tl::types::InputPeerSelf);
     let about = tl::functions::messages::EditChatAbout {
         peer,
         about: String::new(),
@@ -228,7 +260,7 @@ async fn sticker_surface(client: &Client) {
 
     let one = tl::functions::messages::GetStickerSet {
         stickerset: tl::enums::InputStickerSet::ShortName(
-            tl::types::input_sticker_set::input_sticker_set_short_name::InputStickerSetShortName {
+            tl::types::InputStickerSetShortName {
                 short_name: String::new(),
             },
         ),

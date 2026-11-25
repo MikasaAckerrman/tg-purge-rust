@@ -164,8 +164,14 @@ jobs:
       - name: "cargo-ndk"
         run: |
           set -o pipefail
-          if cargo install cargo-ndk --locked --version 3.0.6 > ndkinst.log 2>&1; then
-            tail -3 ndkinst.log
+          # Раунд 7: `--version 3.0.6` → «could not find cargo-ndk in registry with
+          # version =3.0.6». Версию НЕ пиннуем: берём последнюю, а записанную
+          # версию логируем, чтобы прогон был воспроизводим по факту.
+          if cargo install cargo-ndk --locked > ndkinst.log 2>&1; then
+            tail -4 ndkinst.log
+            # вывод в файл, не в head: pipefail + SIGPIPE = паника cargo (раунд 4)
+            cargo ndk --version > ndkver.txt 2>&1 || true
+            sed -n '1,3p' ndkver.txt
           else
             echo "::error::cargo-ndk не установился"
             sed -n '1,80p' ndkinst.log
