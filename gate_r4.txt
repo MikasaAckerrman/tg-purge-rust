@@ -1,0 +1,10 @@
+=== 1) валидация ДО пуша ===
+CARGO OK: package purge v0.1.0 edition=2021
+профиль release: {'opt-level': 3, 'lto': 'thin', 'strip': True, 'codegen-units': 4, 'panic': 'abort'}
+YAML OK: jobs = ['host', 'android']
+src/main.rs: 1433 байт, скобки сбалансированы
+src/caps.rs: 11198 байт, скобки сбалансированы
+
+ИТОГ: ГОТОВО К ПУШУ
+валидация прошла
+=== 2) push ===

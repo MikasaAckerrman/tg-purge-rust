@@ -5,3 +5,6 @@ Traceback (most recent call last):
   File "<string>", line 4, in <module>
 KeyError: 'package'
 === 3) push ===
+push exit=0 HEAD=d871087
+=== 4) ждём CI и читаем вердикт ===
+run_id=45627820919
