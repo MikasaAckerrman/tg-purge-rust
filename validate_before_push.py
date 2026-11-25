@@ -165,6 +165,11 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
     if re.search(r"InputFile::InputFile\b|InputChatPhoto::InputChatPhoto\b", code):
         print(f"src/{f}: префикс типа у варианта отрезается (InputFile::File / InputChatPhoto::…)")
         ok = False
+    # раунд 9: rustifier.rs:96 режет префикс типа ТОЛЬКО если имя начинается с него
+    if "InputChatPhoto::Uploaded(" in code:
+        print(f"src/{f}: inputChatUploadedPhoto НЕ начинается с InputChatPhoto ⇒ вариант полный: "
+              f"InputChatPhoto::InputChatUploadedPhoto (E0599 в раунде 9)")
+        ok = False
     # раунд 8: варианты без параметров генерируются UNIT (enums.rs:73-77)
     for unit in ("InputChatPhoto::Empty", "InputPeer::PeerSelf", "InputChannel::Empty",
                  "InputStickerSet::Empty"):

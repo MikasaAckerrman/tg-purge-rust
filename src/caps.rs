@@ -59,6 +59,9 @@
 //!       inputChatUploadedPhoto   → InputChatPhoto::Uploaded
 //!       inputFileBig             → InputFile::Big
 //!       inputStickerSetShortName → InputStickerSet::ShortName
+//!     ★ Если имя конструктора НЕ начинается с имени типа, префикс НЕ режется и
+//!       вариант получает ПОЛНОЕ имя: inputChatUploadedPhoto →
+//!       `InputChatPhoto::InputChatUploadedPhoto`, а НЕ ::Uploaded (раунд 9: E0599).
 //!     Структуры — прямо в `tl::types::X` (вложенный модуль ТОЛЬКО у namespaced
 //!     конструкторов вида `upload.fileCdnRedirect = upload.File`).
 //!     (rustifier.rs: check_def_qual_name "userEmpty = User" → "crate::types::UserEmpty");
@@ -213,7 +216,11 @@ async fn decoration_surface(client: &Client, channel_id: i64, access_hash: i64) 
     //   (check_def_qual_name: "userEmpty = User" → "crate::types::UserEmpty");
     //   вложенный модуль появляется только у namespaced-конструкторов
     //   ("upload.fileCdnRedirect = upload.File" → "crate::types::upload::FileCdnRedirect").
-    let photo = tl::enums::InputChatPhoto::Uploaded(tl::types::InputChatUploadedPhoto {
+    // ★ ВАРИАНТ = ПОЛНОЕ ИМЯ КОНСТРУКТОРА, НЕ «Uploaded»: rustifier.rs:96-100
+    //   отрезает префикс типа только если имя конструктора НАЧИНАЕТСЯ с него, а
+    //   "InputChatUploadedPhoto".starts_with("InputChatPhoto") == false.
+    //   Раунд 9: E0599 «no variant named Uploaded found for enum InputChatPhoto».
+    let photo = tl::enums::InputChatPhoto::InputChatUploadedPhoto(tl::types::InputChatUploadedPhoto {
         file: Some(tl::enums::InputFile::Big(tl::types::InputFileBig {
             id: 0,
             parts: 0,

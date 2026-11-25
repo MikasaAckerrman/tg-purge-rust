@@ -3,3 +3,51 @@ ok: самопроверка: 15 из 15 прошли
 ok красный: YAML ПЛОХО: сломанный канал: cargo tree --depth 1 2>&1 | head -20
 ok зелёный
 === 2) push ===
+push exit=0 HEAD=090de07
+=== 3) ждём CI ===
+run_id=45654300768
+state: completed / failure
+jobs: 2
+
+JOB host: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   FAIL  5 сборка релиза (lib cdylib + bin)
+   skip  6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK    9 сохранить логи на провал
+   OK   18 Post Run actions/checkout@v4
+   OK   19 Complete job
+
+JOB android: completed / failure
+   OK    1 Set up job
+   OK    2 Run actions/checkout@v4
+   OK    3 Run dtolnay/rust-toolchain@stable
+   OK    4 версия тулчейна
+   OK    5 Android cmdline-tools (без сторонних экшенов)
+   OK    6 NDK r27
+   OK    7 cargo-ndk
+   FAIL  8 сборка под Android arm64-v8a
+   skip  9 проверить артефакты
+   skip 10 Run actions/upload-artifact@v4
+   OK   11 сохранить логи на провал
+   OK   22 Post Run actions/checkout@v4
+   OK   23 Complete job
+
+=== 4) аннотации упавших ===
+--- job 139346739703 ---
+  [failure] .github:130
+      Process completed with exit code 1.
+  [failure] .github:17
+      СБОРКА УПАЛА — полный лог ниже
+--- job 139346740111 ---
+  [failure] .github:180
+      Process completed with exit code 1.
+  [failure] .github:19
+      ANDROID-СБОРКА УПАЛА — лог ниже
+
+=== 5) логи-артефакты ===
+R9_DONE
