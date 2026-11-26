@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Чистка</title>
+<link rel="stylesheet" href="/ui/app.css">
+</head>
+<body>
+
+<!-- 1. ГДЕ: вся строка тапается -->
+<button class="row" id="rowWhere" data-role="where">
+  <span class="ava" id="ava"></span>
+  <span class="col">
+    <span class="main" id="whereTitle">—</span>
+    <span class="sub" id="whereSub"></span>
+  </span>
+  <span class="mark" id="whereMark"></span>
+</button>
+<div class="panel" id="panelWhere" hidden>
+  <input class="field" id="searchQ" type="text" autocomplete="off" spellcheck="false"
+         enterkeyhint="search" aria-label="поиск чата">
+  <div class="list" id="searchList"></div>
+</div>
+
+<!-- 2. КОГО -->
+<button class="row" id="rowWho" data-role="who">
+  <span class="col">
+    <span class="label" id="whoLabel">ЦЕЛИ</span>
+    <span class="main" id="whoMain"></span>
+  </span>
+  <span class="mark" id="whoMark"></span>
+</button>
+<div class="panel" id="panelWho" hidden>
+  <input class="field" id="whoFilter" type="text" autocomplete="off" aria-label="фильтр по имени или нику">
+  <div class="list" id="whoList"></div>
+  <div class="foot">
+    <button class="act" id="whoDone">готово</button>
+    <span class="note" id="whoNote"></span>
+  </div>
+</div>
+
+<!-- 3. ЧТО: сегмент из двух, вплотную к кнопке пуска -->
+<div class="seg" id="segWhat" role="radiogroup" aria-label="что удаляем">
+  <button class="segb" id="whatNew" data-mode="new" role="radio" aria-checked="true"></button>
+  <button class="segb" id="whatAll" data-mode="all" role="radio" aria-checked="false"></button>
+</div>
+
+<!-- 4. ПУСК: одна кнопка -->
+<button class="power" id="power"></button>
+<div class="panel" id="panelSweep" hidden>
+  <div class="ask" id="sweepAsk"></div>
+  <div class="foot">
+    <button class="danger" id="sweepGo"></button>
+    <button class="act ghost" id="sweepCancel">ОТМЕНА</button>
+  </div>
+  <div class="note" id="sweepNote"></div>
+</div>
+
+<!-- статус = последствие -->
+<div class="status" id="status"></div>
+
+<!-- ещё: одна текстовая строка -->
+<button class="more" id="more"></button>
+<div class="panel" id="panelMore" hidden>
+  <div class="list" id="moreList"></div>
+</div>
+
+<!-- панели «ещё» -->
+<div class="panel deep" id="panelLook" hidden>
+  <div class="hrow"><span class="label" id="lookTitle"></span><button class="act ghost" data-close="look"></button></div>
+  <div class="look">
+    <span class="ava big" id="lookAva"></span>
+    <div class="col">
+      <div class="label" id="lblAbout"></div>
+      <div class="txt" id="lookAbout"></div>
+      <div class="label" id="lblRef"></div>
+      <div class="txt dim" id="lookRef"></div>
+    </div>
+  </div>
+  <div class="list" id="lookList"></div>
+  <div class="note" id="lookNote"></div>
+</div>
+
+<div class="panel deep" id="panelRules" hidden>
+  <div class="hrow"><span class="label" id="rulesTitle"></span><button class="act ghost" data-close="rules"></button></div>
+  <div class="list" id="ruleList"></div>
+  <div class="label sub" id="rulesNewLbl"></div>
+  <div class="list" id="packList"></div>
+  <div class="grid" id="stkGrid"></div>
+  <div class="form">
+    <label class="fl" for="ruleWho"><span id="lblRuleWho"></span>
+      <select id="ruleWho" class="field"></select>
+    </label>
+    <label class="fl" for="ruleTrigger"><span id="lblRuleTrigger"></span>
+      <select id="ruleTrigger" class="field"></select>
+    </label>
+    <label class="fl" for="ruleMode"><span id="lblRuleMode"></span>
+      <select id="ruleMode" class="field"></select>
+    </label>
+    <div class="pair2">
+      <label class="fl" for="ruleCd"><span id="lblRuleCd"></span>
+        <input id="ruleCd" class="field" type="text" inputmode="numeric" value="20">
+      </label>
+      <label class="fl" for="ruleRate"><span id="lblRuleRate"></span>
+        <input id="ruleRate" class="field" type="text" inputmode="numeric" value="2">
+      </label>
+    </div>
+    <button class="act wide" id="ruleCreate"></button>
+    <div class="note" id="ruleNote"></div>
+    <div class="note warn" id="ruleWarn"></div>
+  </div>
+</div>
+
+<div class="panel deep" id="panelLog" hidden>
+  <div class="hrow"><span class="label" id="logTitle"></span><button class="act ghost" data-close="log"></button></div>
+  <div class="list" id="logList"></div>
+  <div class="foot">
+    <button class="act ghost" id="logRun"></button>
+    <span class="note" id="logMissed"></span>
+  </div>
+</div>
+
+<div class="panel deep" id="panelChats" hidden>
+  <div class="hrow"><span class="label" id="chatsTitle"></span><button class="act ghost" data-close="chats"></button></div>
+  <div class="list" id="chatsList"></div>
+  <div class="foot">
+    <button class="act ghost" id="chatsReload"></button>
+    <span class="note" id="chatsNote"></span>
+  </div>
+</div>
+
+<div class="panel deep" id="panelErr" hidden>
+  <div class="hrow"><span class="label" id="errTitle"></span><button class="act ghost" data-close="err"></button></div>
+  <div class="list" id="errList"></div>
+</div>
+
+<script src="/ui/strings.js"></script>
+<script src="/ui/app.js"></script>
+</body>
+</html>

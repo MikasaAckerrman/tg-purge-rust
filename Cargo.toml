@@ -3,45 +3,47 @@ name = "purge"
 version = "0.1.0"
 edition = "2021"
 
-# ГЕЙТ R1 (PLAN_RUST §3): crate обязан собираться для
-#   (a) x86_64-unknown-linux-gnu  — интеграционные тесты в CI,
-#   (b) aarch64-linux-android     — .so внутрь APK.
-# Локально в песочнице собирать НЕВОЗМОЖНО: grammers-tl-types 0.12.0 имеет
-# edition = "2024" ⇒ Cargo >= 1.85, а в Alpine rustc/cargo 1.83
-# (`cargo fetch` падает на rand_core 0.10.1). Это ограничение тулчейна, не баг.
-
+# ГЕЙТ R1 (PLAN_RUST §3, §10): ПРОЙДЕН в раундах 13–20 — host + android зелёные,
+# 0 warning / 0 error, 69 юнит-тестов, бинарь `purge` = ELF aarch64 «for Android 24».
+#
+# ★ 26.11: crate-type больше НЕ содержит cdylib. Причина — замер раунда 18:
+#   `nm -D --defined-only libpurge.so` → 0 символов T (strip=true и ни одного
+#   `#[no_mangle] extern "C"`), значит Kotlin звать .so нечем, а починка требует
+#   либо unsafe-моста (ломает `#![deny(unsafe_code)]`), либо JNA.
+#   Путь «APK поднимает бинарь `purge serve` как дочерний процесс» обходит это
+#   целиком: тот же loopback HTTP, ноль FFI, и проверяемо в CI без устройства
+#   (readelf: NEEDED только bionic). См. PLAN_RUST §11.
+#
+# ★ panic = "abort" убран. Две причины, обе измерены:
+#   1) `cargo test --release` с ним несовместим (раунд 4: тесты приходилось гонять
+#      в dev-профиле);
+#   2) в дочернем процессе APK паника = abort всего процесса, то есть один баг
+#      убивал бы весь движок вместо одной задачи. Unwind позволяет вернуть ошибку
+#      через границу HTTP и остаться живым.
 [lib]
 name = "purge"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [[bin]]
 name = "purge"
 path = "src/main.rs"
 
 [dependencies]
-# default-features = false убирает sqlite-storage ⇒ libsql/rusqlite (C-зависимость)
-# не попадает в граф, и Android собирается без C-компилятора.
-# "fs" оставляем: upload_file по пути требует tokio/fs.
+# default-features = false убирает sqlite-storage ⇒ libsql (C-зависимость) не попадает
+# в граф, и Android собирается без C-компилятора.
 grammers-client = { version = "0.12.0", default-features = false, features = ["fs"] }
-# ★ Сессия сохраняется НАМИ (grammers прямо предупреждает: MemorySession не умеет
-# персистентности, а повторный лин costly по flood wait). Внутренние типы
-# DcOption/PeerInfo/UpdatesState имеют serde под фичей grammers-session "serde",
-# а фичи в Cargo унифицируются по графу — поэтому подключаем её здесь напрямую,
-# несмотря на то что grammers-client собственного serde-passthrough не имеет
-# (его features: default=["fs"], html, markdown, parse_invite_link, proxy).
 grammers-session = { version = "0.12.0", default-features = false, features = ["serde"] }
 grammers-mtsender = { version = "0.12.0", default-features = false }
 grammers-tl-types = { version = "0.12.0", default-features = false }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "io-util", "net", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# tiny_http УБРАН (раунд 11: warning `unused dependency`): HTTP-слой — фаза Ф-R5,
-# держать мёртвую зависимость в графе = лишний вес .so и ложное ощущение готовности.
-# Вернём её в Ф-R5 вместе с кодом сервера, а не заранее.
+# HTTP-слой (src/api.rs) — только std + serde_json + tiny_http, без grammers,
+# поэтому тестируется ЛОКАЛЬНО (tools/localtest), а не шестью минутами CI.
+tiny_http = "0.12"
 
 [profile.release]
 opt-level = 3
 lto = "thin"
 strip = true
 codegen-units = 4
-panic = "abort"

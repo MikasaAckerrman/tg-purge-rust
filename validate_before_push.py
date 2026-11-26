@@ -92,9 +92,20 @@ if isinstance(cli, dict) and cli.get("default-features") is not False:
     ok = False
 
 ct = man.get("lib", {}).get("crate-type", [])
-if "cdylib" not in ct:
-    print("CARGO ПЛОХО: lib.crate-type не содержит cdylib — в APK класть нечего")
+# ★ 26.11: проверка переведена с cdylib на rlib. Причина — замер раунда 18, а не вкус:
+#   `nm -D --defined-only libpurge.so` дал 0 символов T (strip=true + ни одного
+#   `#[no_mangle] extern "C"`), значит JNI-мост из Kotlin звать нечем, а его починка
+#   требует unsafe (ломает `#![deny(unsafe_code)]`). APK запускает бинарь `purge serve`
+#   как ДОЧЕРНИЙ ПРОЦЕСС и говорит с ним по тому же loopback HTTP (PLAN_RUST §11),
+#   поэтому обязательное требование теперь — наличие [[bin]], а не cdylib.
+if "rlib" not in ct:
+    print(f"CARGO ПЛОХО: lib.crate-type не содержит rlib — движок не сможет использовать слои")
     ok = False
+if not man.get("bin"):
+    print("CARGO ПЛОХО: нет [[bin]] — APK нечего запускать как процесс (путь 26.11)")
+    ok = False
+else:
+    print(f"CARGO OK: crate-type={ct}, bins={[b.get('name') for b in man['bin']]}")
 
 if not man.get("bin"):
     print("CARGO ПЛОХО: нет [[bin]] — `purge --caps` не запустить")
@@ -163,7 +174,15 @@ else:
 # Модули, зависящие только от std ⇒ rustc 1.83 компилирует и тестирует их за доли
 # секунды, тогда как CI-прогон стоит 6 минут. Каждый такой модуль обязан быть здесь,
 # иначе его логика проверяется «на глаз» в логах упавшего раннера.
-PURE_MODULES = ("rate.rs", "util.rs")
+# Модули, тестируемые ЛОКАЛЬНО без CI. Делятся на два класса, и путать их нельзя:
+#   std-only  → гоняются голым `rustc --test` (зависимостей нет вообще)
+#   dep-based → гоняются только через cargo (нужны serde_json / tiny_http),
+#               поэтому их покрает tools/localtest; голый rustc на них ПАДАЕТ
+#               (проверено 26.11: PURE ПЛОХО на shape.rs/api.rs был багом валидатора,
+#               а не боевого кода — локальный rustc не знает про crates.io).
+STD_ONLY = ("rate.rs", "util.rs")
+DEP_BASED = ("shape.rs", "api.rs")
+PURE_MODULES = STD_ONLY + DEP_BASED
 
 for mod in PURE_MODULES:
     path = f"{ROOT}/src/{mod}"
@@ -176,12 +195,25 @@ for mod in PURE_MODULES:
     # ★ Проверяем по КОДУ, а не по файлу: в doc-заголовке rate.rs намеренно упомянут
     #   grammers-tl-types (объяснение, зачем модуль вынесен), и наивная проверка
     #   `"grammers" in raw` ловила бы собственный комментарий.
-    if "grammers" in braces2.blanks(raw):
+    #   api.rs тоже обязан быть без grammers — в этом весь смысл локальных тестов.
+    code = braces2.blanks(raw)
+    if re.search(r"\buse\s+grammers", code) or re.search(r"\bgrammers_[a-z_]+::", code):
         print(f"PURE ПЛОХО: src/{mod} обязан быть без зависимостей от grammers — иначе теряет смысл локальный прогон")
         ok = False
     if "#[cfg(test)]" not in braces2.blanks(raw):
         print(f"PURE ПЛОХО: src/{mod} не содержит #[cfg(test)] — локально тестировать нечего")
         ok = False
+    if mod not in STD_ONLY:
+        # dep-based (serde_json/tiny_http) голым rustc НЕ собрать — он не знает про
+        # crates.io. Их покрает tools/localtest; здесь только сверим, что он их берёт.
+        hpath = f"{ROOT}/tools/localtest/main.rs"
+        harness = open(hpath, encoding="utf-8").read() if os.path.exists(hpath) else ""
+        if f"../../src/{mod}" not in harness:
+            print(f"PURE ПЛОХО: src/{mod} не подключён в tools/localtest/main.rs — он не тестируется")
+            ok = False
+        else:
+            print(f"PURE OK: src/{mod} покрыт localtest (cargo, а не голый rustc)")
+        continue
     exe = f"/tmp/pure_test_{mod.replace('.', '_')}"
     p = subprocess.run(["rustc", "--test", "--edition", "2021", path, "-o", exe],
                        capture_output=True, text=True)
@@ -282,6 +314,28 @@ if os.path.exists(f"{LT}/Cargo.toml"):
         ok = False
 else:
     print("LOCALTEST ПЛОХО: нет tools/localtest/Cargo.toml — JSON-слой не тестируется локально")
+    ok = False
+
+# ---- UI-ассеты: копия в Rust-репо обязана быть побайтово идентична источнику ----
+# Две копии одного UI = рассинхрон, и это ровно тот класс «нажал — не изменилось».
+# CI не видит песочницу, поэтому проверка здесь, локально (26.11).
+PY_UI = "/var/minis/shared/tg/ui"
+RS_UI = f"{ROOT}/assets/ui"
+if os.path.isdir(PY_UI) and os.path.isdir(RS_UI):
+    for f in ("index.html", "app.css", "app.js", "strings.js"):
+        a, b = f"{PY_UI}/{f}", f"{RS_UI}/{f}"
+        if not os.path.exists(b):
+            print(f"UI ПЛОХО: в Rust-репо нет assets/ui/{f} — APK получит белый экран")
+            ok = False
+            continue
+        da, db = open(a, "rb").read(), open(b, "rb").read()
+        if da != db:
+            print(f"UI ПЛОХО: assets/ui/{f} ДРЕЙФИТ от tg/ui/{f} ({len(da)} vs {len(db)} байт)")
+            ok = False
+        else:
+            print(f"UI OK: {f} побайтово идентичен ({len(da)} байт)")
+elif not os.path.isdir(RS_UI):
+    print("UI ПЛОХО: нет assets/ui — путь «APK запускает бинарь» некомплектен")
     ok = False
 
 # ---- doctest-ловушки в doc-комментариях (раунд 16: CI упал на моей же команде) ----

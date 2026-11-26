@@ -208,18 +208,61 @@ jobs:
       - name: "проверить артефакты"
         run: |
           set -o pipefail
-          ls -la target/aarch64-linux-android/release/libpurge.so target/aarch64-linux-android/release/purge
-          file target/aarch64-linux-android/release/libpurge.so | tee android_file.txt
-          nm -D --defined-only target/aarch64-linux-android/release/libpurge.so > symbols.txt 2>&1 || true
-          echo "символов T: $(grep -c ' T ' symbols.txt || true)" | tee -a android_file.txt
-          sed -n '1,12p' symbols.txt
+          ls -la target/aarch64-linux-android/release/purge
+          file target/aarch64-linux-android/release/purge | tee android_file.txt
+          # ★ 26.11: путь — «APK запускает бинарь как процесс» (см. PLAN_RUST §11),
+          #   поэтому проверяем ИСПОЛНИМОСТЬ бинаря, а не символы .so: cdylib убран,
+          #   а раунд 18 показал `nm -D` → 0 символов T (strip + нет `#[no_mangle]`).
+          #   ET_EXEC + aarch64 + interp ld-android + NEEDED только bionic
+          #   ⇒ процесс из files_dir поднимется без root и без JNI.
+          readelf -h target/aarch64-linux-android/release/purge > hdr.txt 2>&1 || true
+          grep -E "Class:|Machine:|Type:" hdr.txt | tee -a android_file.txt || true
+          if ! grep -q "Type:.*EXEC" hdr.txt; then
+            echo "::error::бинарь не ET_EXEC — как процесс из APK не запустится"
+            exit 1
+          fi
+          if ! grep -q "AArch64" hdr.txt; then
+            echo "::error::бинарь не aarch64 (Machine)"
+            exit 1
+          fi
+          readelf -d target/aarch64-linux-android/release/purge > dyn.txt 2>&1 || true
+          echo "=== NEEDED / INTERP ==="
+          grep -E "NEEDED|Requesting" dyn.txt | sed 's/^ *//' | tee -a android_file.txt || true
+          if grep "NEEDED" dyn.txt | grep -vqE "libc\.so|libandroid\.so|liblog\.so|libm\.so|libdl\.so"; then
+            echo "::error::в NEEDED есть не-Android зависимость — запуск из APK невозможен"
+            grep "NEEDED" dyn.txt
+            exit 1
+          fi
+          if ! grep -q "ld-android" dyn.txt; then
+            echo "::error::нет Android-интерпретатора (ld-android) — бинарь не запустится на телефоне"
+            exit 1
+          fi
+
+      - name: "UI-ассеты для APK"
+        run: |
+          set -o pipefail
+          # APK кладёт эти четыре файла рядом с бинарём; `purge serve` отдаёт их по /ui/.
+          ls -la assets/ui | tee ui_assets.txt
+          for f in index.html app.css app.js strings.js; do
+            if [ ! -s "assets/ui/$f" ]; then
+              echo "::error::UI-файл $f пуст или отсутствует — WebView покажет белый экран"
+              exit 1
+            fi
+          done
+          # статика обязана быть same-origin с API: проверяем, что в UI нет абсолютных
+          # чужих хостов (иначе «кнопки не работают» вернётся как в minis://-версии)
+          if grep -RInE "https?://" assets/ui/app.js assets/ui/index.html | grep -v "127.0.0.1" | grep -vq "^$"; then
+            echo "::error::в UI есть внешние http-ссылки — same-origin нарушен"
+            grep -RInE "https?://" assets/ui/app.js assets/ui/index.html | grep -v "127.0.0.1"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: purge-android-arm64
+          name: purge-android
           path: |
-            target/aarch64-linux-android/release/libpurge.so
             target/aarch64-linux-android/release/purge
+            assets/ui
           if-no-files-found: error
 
       - name: "сохранить отчёт android"
@@ -230,7 +273,9 @@ jobs:
           path: |
             android.log
             android_file.txt
-            symbols.txt
+            hdr.txt
+            dyn.txt
+            ui_assets.txt
             ndk.log
             bins.txt
             ndkinst.log

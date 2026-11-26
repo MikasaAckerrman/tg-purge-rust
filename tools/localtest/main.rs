@@ -13,6 +13,12 @@ use serde_json::Value;
 #[allow(dead_code)]
 #[path = "../../src/shape.rs"]
 mod shape;
+
+// Боевой HTTP-слой: подключается ТОТ ЖЕ файл, что и в lib.rs. `api` использует
+// `crate::shape`, поэтому порядок объявления важен — shape обязан быть выше.
+#[allow(dead_code)]
+#[path = "../../src/api.rs"]
+mod api;
 // ★ Почему allow здесь и почему это НЕ маскировка: localtest — харнес, а не боевой
 //   crate. В бою `shape` подключён к lib.rs как `pub mod shape;`, поэтому его
 //   pub-функции (plural_form/count_ru/human_deleted/human_targets/PATH_DEFAULTS)

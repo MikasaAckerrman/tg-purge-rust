@@ -21,6 +21,7 @@
 //   у `std::io::Stdin` метод read_line — ВСТРОЕННЫЙ (inherent), а не через трейт
 //   BufRead, поэтому импорт не нужен. Write нужен для flush() промпта.
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -56,6 +57,7 @@ fn main() {
                 2
             }
         },
+        "--serve" => serve_cmd(),
         _ => {
             // Без аргументов — только проверка, что типы сходятся (сети нет).
             caps::pool_typechecks(0);
@@ -100,6 +102,39 @@ fn read_answer(prompt: &str) -> Option<String> {
         Ok(0) => None,
         Ok(_) => Some(s),
         Err(_) => None,
+    }
+}
+
+// ---------------------------------------------------------------- --serve
+/// Поднять HTTP-слой для APK.
+///
+/// ★ Это и есть «управление от APK» без FFI: Kotlin извлекает бинарь `purge` в
+///   files_dir, chmod 700 и запускает `purge serve --addr 127.0.0.1:8790`,
+///   WebView грузит тот же адрес. Слой не трогает Telegram вообще (только std +
+///   serde_json + tiny_http), поэтому работает до и после гейта R2.
+fn serve_cmd() -> i32 {
+    let addr = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "127.0.0.1:8790".to_string());
+    let exe = std::env::current_exe().ok();
+    let dir = exe.as_ref().and_then(|p| p.parent()).map(PathBuf::from);
+    let (assets, state) = match dir {
+        Some(d) => (d.join("ui"), d.join("state.json")),
+        None => {
+            eprintln!("SERVE: не определил каталог бинаря");
+            return 2;
+        }
+    };
+    eprintln!("serve: addr={addr} assets={} state={}", assets.display(), state.display());
+    let cfg = purge::api::Config { addr: addr.clone(), assets, state };
+    let live = std::sync::Arc::new(purge::api::Live::default());
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    match purge::api::serve(cfg, live, stop) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("SERVE УПАЛ: {e}");
+            1
+        }
     }
 }
 

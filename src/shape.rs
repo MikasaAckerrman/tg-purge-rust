@@ -94,6 +94,11 @@ pub const BOOL_KEYS: &[&str] = &[
     "cleaning",
     "known",
     "in_targets",
+    // BA-10 (26.11): различает «цель ещё никогда не выбирались» и «выбор снят ЯВНО»
+    // (live.targets_explicit). Обязана быть и здесь, и в Python BOOL_KEYS: тест
+    // test_bool_keys_match_rust сравнивает таблицы напрямую, и расхождение дало бы
+    // null → "" вместо false в Rust-слое (паритет Python ↔ Rust, 25.11).
+    "targets_explicit",
 ];
 
 /// Ключи, чей тип ЗАВИСИТ ОТ ПУТИ в схеме v3, поэтому в глобальные таблицы они
