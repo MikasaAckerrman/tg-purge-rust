@@ -415,6 +415,40 @@ else:
     else:
         print(f"CI OK: все {len(type_lines)} проверок Type принимают PIE (EXEC|DYN)")
 
+# ★ Раунд 23: интерпретатор обязан искаться НЕ в readelf -d. Раунд 22 писал
+#   `grep -q "ld-android" dyn.txt`, а PT_INTERP в динамической секции не живёт
+#   (замер по артефакту: dyn.txt — 23 записи, ни одной про interp; интерпретатор
+#   виден в `readelf -l` и в выводе `file`). Предикат не мог пройти никогда.
+bad_interp = [l.strip() for l in wf_code.splitlines()
+              if "ld-android" in l and "dyn.txt" in l]
+if bad_interp:
+    print("CI ПЛОХО: интерпретатор ищется в readelf -d (dyn.txt), где PT_INTERP не живёт:")
+    for l in bad_interp[:3]:
+        print("   ", l[:110])
+    ok = False
+elif "system/bin/linker64" not in wf_code:
+    print("CI ПЛОХО: нет проверки Android-интерпретатора по file/readelf -l")
+    ok = False
+else:
+    print("CI OK: интерпретатор проверяется по system/bin/linker64 (file / readelf -l)")
+
+# ★ Закон общего вида: у гейта артефакта обязан быть локальный прогон против
+#   РЕАЛЬНОГО снапшота, иначе он написан на догадке о формате. Два красных раунда
+#   подряд (21, 22) — обе причины ловятся одной секундой локального прогона.
+selftest = f"{ROOT}/tools/ci_gate_selftest.sh"
+if not os.path.exists(selftest):
+    print("CI ПЛОХО: нет tools/ci_gate_selftest.sh — предикаты артефакта не проверялись против снапшота")
+    ok = False
+else:
+    st = open(selftest, encoding="utf-8").read()
+    need = ["system/bin/linker64", "Type:.*(EXEC|DYN)", "NEEDED"]
+    miss = [x for x in need if x not in st]
+    if miss:
+        print(f"CI ПЛОХО: ci_gate_selftest.sh не покрывает {miss} — часть ловушек раундов 21-22 снова открыта")
+        ok = False
+    else:
+        print("CI OK: ci_gate_selftest.sh покрывает Type(PIE), интерпретатор и NEEDED")
+
 # ---- doctest-ловушки в doc-комментариях (раунд 16: CI упал на моей же команде) ----
 # rustdoc гоняет КАЖДЫЙ кодовый блок в //! как doctest. Команда `rustc --test ...`,
 # набранная отступом в 4 пробела после пустой строки, ломает сборку тестов с

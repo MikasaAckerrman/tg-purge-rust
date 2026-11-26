@@ -28,6 +28,7 @@ const UI = {
   whoOrder: [],            // фиксированный порядок строк на время открытой панели (D3-i)
   whoAskClose: false,      // первый тап «закрыть» при несохранённом выборе — ждём второй
   dead: false,
+  staleBuild: "",        // BA-15: серверная сборка отличается, а перезагрузиться сами не смогли
   flash: null,           // {node, text, until, base} — сообщения не затираются опросом
   tapAt: {},              // {ключ: метка} — защита от двойного тапа (D3-ii)
   uiSeq: 0,               // номер отправки /api/ui: порядок на сервере = порядок тапов
@@ -845,6 +846,7 @@ async function onPower() {
 
 function renderStatus() {
   const n = byId("status");
+  if (UI.staleBuild) { setText(n, T.status_stale(UI.staleBuild)); return; }
   if (UI.dead || !DATA) { setText(n, T.status_dead + " · " + T.status_dead_how); return; }
   const live = !!(DATA.chat && (DATA.chat.live || {}).enabled);
   const d = DATA.demon || {};
@@ -1168,10 +1170,38 @@ function renderDead() {
 }
 
 /* ───────── опрос: 4 с, пауза в фоне ───────── */
+/* BA-15 (26.11): штамп СБОРКИ этой страницы, вставленный движком в <html data-build>
+   (engine.py:h_index). Полл обновляет только ДАННЫЕ, поэтому фикс app.js не мог
+   попасть в уже открытую вкладку: замер 26.11 — код исправлен в 14:45:20, а юзер
+   продолжал видеть BA-1 («панель закрылась, сверху тот же чат»), потому что его
+   WebView исполнял старый JS. `no-cache`/`?v=` спасают только при навигации.
+   Читается ОДИН раз: это и есть «кто я», а не «что на сервере». */
+const SELF_BUILD = ((document.documentElement.dataset || {}).build) || "";
+
+function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function ssSet(k, v) { try { sessionStorage.setItem(k, v); return true; } catch (e) { return false; } }
+
+/* Возвращает true, если страница обязана перезагрузиться (вызывающий не рисует). */
+function checkBuild(server) {
+  if (!SELF_BUILD || !server || server === SELF_BUILD) return false;
+  // Не более ОДНОЙ попытки на одну серверную сборку. Если после перезагрузки штамп
+  // всё ещё расходится, сервер отдаёт код старше своего же штампа (например, маркер
+  // в index.html пропал и data-build пуст) — бесконечный reload убил бы панель,
+  // поэтому показываем текст вместо цикла.
+  const tried = ssGet("tg_purge_build_tried");
+  if (tried === server) { UI.staleBuild = server; return false; }
+  if (ssSet("tg_purge_build_tried", server)) { location.reload(); return true; }
+  // sessionStorage недоступен (приватный режим WebView): крутить страницу нельзя,
+  // но и молчать нельзя — юзер должен видеть, что сборка устарела.
+  UI.staleBuild = server;
+  return false;
+}
+
 async function refresh() {
   const j = await api("/api/state");
   if (!j.ok) { renderDead(); return; }
   UI.dead = false;
+  if (checkBuild(j.build || "")) return;
   DATA = j;
   renderAll();
 }

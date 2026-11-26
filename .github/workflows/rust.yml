@@ -268,15 +268,27 @@ jobs:
             exit 1
           fi
           readelf -d target/aarch64-linux-android/release/purge > dyn.txt 2>&1 || true
-          echo "=== NEEDED / INTERP ==="
-          grep -E "NEEDED|Requesting" dyn.txt | sed 's/^ *//' | tee -a android_file.txt || true
+          echo "=== NEEDED ==="
+          grep "NEEDED" dyn.txt | sed 's/^ *//' | tee -a android_file.txt || true
           if grep "NEEDED" dyn.txt | grep -vqE "libc\.so|libandroid\.so|liblog\.so|libm\.so|libdl\.so"; then
             echo "::error::в NEEDED есть не-Android зависимость — запуск из APK невозможен"
             grep "NEEDED" dyn.txt
             exit 1
           fi
-          if ! grep -q "ld-android" dyn.txt; then
-            echo "::error::нет Android-интерпретатора (ld-android) — бинарь не запустится на телефоне"
+          # ★ Раунд 23: проверка интерпретатора исправлена ВТОРЫМ разом. Раунд 22 искал
+          #   `ld-android` в выводе `readelf -d` — а PT_INTERP там НЕ ЖИВЁТ: readelf -d
+          #   печатает динамическую секцию (NEEDED/FLAGS/REL…), поэтому проверка не могла
+          #   пройти НИКОГДА. Доказательство из артефакта android-report раунда 22:
+          #     dyn.txt: 23 записи, «grep -icE "interp|program interpreter"» → 0
+          #     file   : «…dynamically linked, interpreter /system/bin/linker64…»
+          #   Интерпретатор виден в `readelf -l` (программные заголовки) и в выводе file.
+          #   Закон: на aarch64 Android это /system/bin/linker64, а не ld-android.so
+          #   (последний — отдельная библиотека, встречалась в x86-артефактах).
+          readelf -l target/aarch64-linux-android/release/purge > interp.txt 2>&1 || true
+          grep -E "program interpreter|INTERP" interp.txt | sed 's/^ *//' | tee -a android_file.txt || true
+          if ! grep -q "system/bin/linker64" android_file.txt; then
+            echo "::error::нет Android-интерпретатора /system/bin/linker64 — бинарь не запустится на телефоне"
+            echo "  readelf -l: $(grep -c . interp.txt || true) строк; file: $(head -1 android_file.txt)"
             exit 1
           fi
 
@@ -317,6 +329,7 @@ jobs:
             android_file.txt
             hdr.txt
             dyn.txt
+            interp.txt
             ui_assets.txt
             ndk.log
             bins.txt
