@@ -126,6 +126,16 @@ function ensureEmpty(box, text) {
    не изменилось: shown(id, base) сравнивает с тем, что было на момент flash. */
 function clearFlash() { UI.flash = null; }
 
+/* BA-16 (26.11): строка причины отказа ВНУТРИ панели поиска. Прячется, когда текста
+   нет: пустой <div class="note"> сдвигал бы список вниз на каждой отрисовке, и
+   юзер видел бы «прыгающий» интерфейс без причины. */
+function note(id, text) {
+  const n = byId(id);
+  if (!n) return;
+  if (text) { setText(n, text); n.hidden = false; }
+  else { n.hidden = true; setText(n, ""); }
+}
+
 function flash(node, text) {
   if (!node) return;
   UI.flash = {id: node.id, text: String(text || ""), until: Date.now() + 4000,
@@ -384,6 +394,9 @@ function renderWhere() {
 
 function renderSearch() {
   const box = byId("searchList");
+  // BA-16: причина прошлого отказа живёт только до следующей попытки — иначе она
+  // висела бы под новым списком и выглядела как «опять не открылось».
+  note("searchNote", "");
   const q = (UI.searchQ || "").trim();
   if (!q) { reconcile(box, [], () => "x", mkRow, () => {}); ensureEmpty(box, T.where_hint); return; }
   const res = UI.searchRes || {chats: [], people: []};
@@ -467,13 +480,30 @@ async function openChat(it) {
   UI.searchRes = null;
   const sq = byId("searchQ");
   if (sq) sq.value = "";
-  // BA-4: проверка несохранённого выбора — ДО сетевого вызова. Порядок важен:
-  // если спросить после /api/open, чат сменился бы на сервере, а UI отказался бы
-  // обновиться — худшее из состояний (смена без отражения на экране).
-  if (!gotoPanel(null)) return;
+  // BA-4 (26.11): несохранённый выбор спрашиваем ДО запроса — иначе отмена
+  // осталась бы уже ПОСЛЕ смены чата на сервере. leaveWho ничего не закрывает,
+  // поэтому панель до ответа жива и причина отказа будет куда показать (BA-16).
+  if (!leaveWho(null)) return;
   clearFlash();
-  const j = await api("/api/open", {q: String(it.id)});
-  if (!j.ok) { flash(byId("whereSub"), j.error || T.not_saved); return; }
+  // BA-16 (26.11, найдено ЗАХВАТОМ ЗАПРОСА, а не чтением кода): id резолвится
+  // только для пиеров, которых знает сессия Kurigram. Человек из ГЛОБАЛЬНОГО поиска
+  // в наших диалогах не состоит → access_hash нет → Telegram отвечает PeerIdInvalid
+  // ни одной из трёх id-форм:
+  //   POST /api/open {"q":"8847655188"} → 400 «(-1008847655188:ChannelInvalid |
+  //                                        8847655188:PeerIdInvalid | -8847655188:ChatIdInvalid…»
+  //   POST /api/open {"q":"we_erti"}    → 200  ← ТОТ ЖЕ человек
+  //   POST /api/open {"q":"@we_erti"}   → 200 ; {"q":"t.me/we_erti"} → 200
+  // /api/search уже отдаёт username этой строки (engine.py:h_search), поэтому
+  // отправлять надо его; id остаётся запасным для строк без юзернейма.
+  const uname = String(it.username || "").replace(/^@+/, "").trim();
+  const j = await api("/api/open", {q: uname ? "@" + uname : String(it.id)});
+  if (!j.ok) {
+    // Панель ЗАКРЫВАТЬ нельзя: закрытая панель + молчание = «нажал и ничего не
+    // изменилось» (дословная жалоба 26.11). Причина — в searchNote, панель открыта.
+    note("searchNote", T.open_failed(j.error || T.status_dead));
+    return;
+  }
+  gotoPanel(null);
   DATA = j;
   UI.whoSel = ((j.chat || {}).live || {}).targets ? (j.chat.live.targets || []).slice() : [];
   UI.pickSha = ""; UI.packStk = []; UI.packOpen = ""; UI.ask = null; UI.scope = "new";

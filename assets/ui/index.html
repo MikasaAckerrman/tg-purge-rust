@@ -22,6 +22,10 @@
   <input class="field" id="searchQ" type="text" autocomplete="off" spellcheck="false"
          enterkeyhint="search" aria-label="поиск чата">
   <div class="list" id="searchList"></div>
+  <!-- BA-16 (26.11): причина отказа обязана жить ВНУТРИ панели. Пока её не было,
+       тап по строке закрывал панель и показывал ошибку в whereSub на 4 с — юзер
+       видел «клик прошёл, поле ввода убралось, ничего не сменилось» без причины. -->
+  <div class="note" id="searchNote" hidden></div>
 </div>
 
 <!-- 2. КОГО -->
