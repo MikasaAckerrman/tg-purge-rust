@@ -244,6 +244,23 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
                   f"и нет `_ =>` → E0004 на сборке")
             ok = False
 
+# ---- doctest-ловушки в doc-комментариях (раунд 16: CI упал на моей же команде) ----
+# rustdoc гоняет КАЖДЫЙ кодовый блок в //! как doctest. Команда `rustc --test ...`,
+# набранная отступом в 4 пробела после пустой строки, ломает сборку тестов с
+# «expected one of `!` or `::`, found -» — и выглядит как «упали юнит-тесты».
+if os.path.exists(f"{ROOT}/doctest_scan.py"):
+    d = subprocess.run([sys.executable, "-u", f"{ROOT}/doctest_scan.py"],
+                       capture_output=True, text=True)
+    if d.returncode != 0:
+        print("DOCTEST ПЛОХО: в doc-комментариях есть Rust-блоки без фенса:")
+        print((d.stdout or "")[:1500])
+        ok = False
+    else:
+        print((d.stdout or "").strip().splitlines()[-1:][0] if d.stdout else "DOCTEST OK")
+else:
+    print("DOCTEST ПЛОХО: нет doctest_scan.py — ловушка раунда 16 не проверяется")
+    ok = False
+
 # ---- Rust-исходники: честный баланс скобок (строки/комментарии не в счёт) ----
 # Наивный `src.count('{')` давал ЛОЖНЫЕ срабатывания: в store.rs есть
 # `std::fs::write(&path, b"{ ne json ")` и скобки в doc-комментариях.

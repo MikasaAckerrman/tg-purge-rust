@@ -11,3 +11,104 @@ PURE OK: src/util.rs — test result: ok. 17 passed; 0 failed; 0 ignored; 0 meas
 сценариев: 2029 | несовпадений: 0
 ВЫВОД: Rust и Python совпадают по всем сценариям матрицы.
 === 3) push ===
+push exit=0 HEAD=b241a31
+=== 4) ждём CI ===
+run_id=45679715553
+=== 5) вердикт ===
+run_id=45679715553
+state: completed / failure
+
+JOB android: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   OK   8 сборка под Android arm64-v8a
+   OK   9 проверить артефакты
+   OK  10 Run actions/upload-artifact@v4
+   OK  11 сохранить отчёт android
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+JOB host: completed / failure
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 сборка релиза (lib cdylib + bin)
+   FAIL 6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   skip  7 список возможностей, доказанных компилятором
+   skip  8 размер артефактов
+   OK   9 сохранить отчёт
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+артефакты: 3
+  purge-android-arm64: 1207376 Б → /var/minis/shared/rustspike/logs_pull/purge-android-arm64
+  android-report: 5906 Б → /var/minis/shared/rustspike/logs_pull/android-report
+
+--- ndk.log: 93 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+    [=====================                  ] 54% Unzipping... android-ndk-r27/sourc
+    [=====================                  ] 54% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/CHANG
+    [=======================================] 100% Unzipping... android-ndk-r27/CHAN
+    
+
+--- android.log: 220 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       |               ^^^^^^^
+       |
+       = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+    
+    warning: `purge` (bin "purge") generated 1 warning
+        Finished `release` profile [optimized] target(s) in 51.77s
+
+--- ndkinst.log: 210 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+        Finished `release` profile [optimized] target(s) in 28.18s
+      Installing /home/runner/.cargo/bin/cargo-ndk
+      Installing /home/runner/.cargo/bin/cargo-ndk-env
+      Installing /home/runner/.cargo/bin/cargo-ndk-runner
+      Installing /home/runner/.cargo/bin/cargo-ndk-test
+       Installed package `cargo-ndk v4.1.2` (executables `cargo-ndk`, `cargo-ndk-env`, `cargo-ndk-runner`, `cargo-ndk-test`)
+  host-report: 5185 Б → /var/minis/shared/rustspike/logs_pull/host-report
+
+--- build.log: 101 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       |               ^^^^^^^
+       |
+       = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+    
+    warning: `purge` (bin "purge") generated 1 warning
+        Finished `release` profile [optimized] target(s) in 52.35s
+
+--- test.log: 190 строк, 3 ошибок
+    error: expected one of `!` or `::`, found `-`
+     --> src/util.rs:4:7
+      |
+    4 | rustc --test --edition 2021 src/util.rs -o /tmp/util && /tmp/util
+      |       ^ expected one of `!` or `::`
+    
+    error: aborting due to 1 previous error
+   ---
+    error: aborting due to 1 previous error
+    
+    Couldn't compile the test.
+    
+    failures:
+        src/util.rs - util (line 3)
+    
+   ---
+    error: doctest failed, to rerun pass `--doc`
+   ---
+
+=== 6) ошибки компиляции (если были) ===
+
+=== 7) CAPS-таблица ===
+caps.txt нет
+R16_DONE
