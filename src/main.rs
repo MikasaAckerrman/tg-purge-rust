@@ -17,7 +17,10 @@
 //! пишет его в файл-канал; движок поллит тот же файл. Второй источник правды не
 //! создаётся: разбор кода один (`purge::util::parse_code`, 17 локальных тестов).
 
-use std::io::{BufRead, Write};
+// ★ BufRead из импорта убран (раунд 17: warning `unused import: BufRead`):
+//   у `std::io::Stdin` метод read_line — ВСТРОЕННЫЙ (inherent), а не через трейт
+//   BufRead, поэтому импорт не нужен. Write нужен для flush() промпта.
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 

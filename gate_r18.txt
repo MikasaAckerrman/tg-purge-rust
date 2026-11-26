@@ -1,0 +1,15 @@
+=== 1) обязательные проверки ===
+ok: самопроверка: 15 из 15 прошли
+ok: скобки сбалансированы
+ok: DOCTEST OK: ни одного Rust-блока без фенса в doc-комментариях
+ok: doctest-сканер краснеет на ловушке и зеленеет на легальном
+ok зелёный:
+CARGO OK: симметрия (7 объявлено, алиасов: 1, собственные имена: ['purge'])
+YAML OK: jobs = ['host', 'android']
+PURE OK: src/rate.rs — test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+PURE OK: src/util.rs — test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+DOCTEST OK: ни одного Rust-блока без фенса в doc-комментариях
+=== 2) паритет Rust↔Python ===
+сценариев: 2029 | несовпадений: 0
+ВЫВОД: Rust и Python совпадают по всем сценариям матрицы.
+=== 3) push ===
