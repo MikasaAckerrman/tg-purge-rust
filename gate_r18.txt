@@ -13,3 +13,119 @@ DOCTEST OK: ни одного Rust-блока без фенса в doc-комм�
 сценариев: 2029 | несовпадений: 0
 ВЫВОД: Rust и Python совпадают по всем сценариям матрицы.
 === 3) push ===
+push exit=0 HEAD=7ecba77
+=== 4) ждём CI ===
+run_id=45754720790
+=== 5) вердикт ===
+run_id=45754720790
+state: completed / success
+
+JOB host: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 сборка релиза (lib cdylib + bin)
+   OK   6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   OK   7 список возможностей, доказанных компилятором
+   OK   8 размер артефактов
+   OK   9 сохранить отчёт
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+JOB android: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   OK   8 сборка под Android arm64-v8a
+   OK   9 проверить артефакты
+   OK  10 Run actions/upload-artifact@v4
+   OK  11 сохранить отчёт android
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+артефакты: 3
+  purge-android-arm64: 1207376 Б → /var/minis/shared/rustspike/logs_pull/purge-android-arm64
+  android-report: 5705 Б → /var/minis/shared/rustspike/logs_pull/android-report
+
+--- android.log: 211 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Compiling grammers-session v0.12.0
+       Compiling grammers-mtproto v0.12.0
+       Compiling grammers-mtsender v0.12.0
+       Compiling grammers-client v0.12.0
+       Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+        Finished `release` profile [optimized] target(s) in 1m 06s
+
+--- ndk.log: 93 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+    [=====================                  ] 54% Unzipping... android-ndk-r27/sourc
+    [=====================                  ] 54% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/CHANG
+    [=======================================] 100% Unzipping... android-ndk-r27/CHAN
+    
+
+--- ndkinst.log: 210 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+        Finished `release` profile [optimized] target(s) in 33.84s
+      Installing /home/runner/.cargo/bin/cargo-ndk
+      Installing /home/runner/.cargo/bin/cargo-ndk-env
+      Installing /home/runner/.cargo/bin/cargo-ndk-runner
+      Installing /home/runner/.cargo/bin/cargo-ndk-test
+       Installed package `cargo-ndk v4.1.2` (executables `cargo-ndk`, `cargo-ndk-env`, `cargo-ndk-runner`, `cargo-ndk-test`)
+  host-report: 5948 Б → /var/minis/shared/rustspike/logs_pull/host-report
+
+--- test.log: 163 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Doc-tests purge
+    
+    running 0 tests
+    
+    test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+    
+
+--- build.log: 92 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Compiling grammers-session v0.12.0
+       Compiling grammers-mtproto v0.12.0
+       Compiling grammers-mtsender v0.12.0
+       Compiling grammers-client v0.12.0
+       Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+        Finished `release` profile [optimized] target(s) in 1m 09s
+
+=== 6) warning'ов должно быть НОЛЬ ===
+--- logs_pull/host-report/build.log.clean: warning=0 error=0 ---
+--- logs_pull/host-report/test.log.clean: warning=0 error=0 ---
+--- logs_pull/android-report/android.log.clean: warning=1 error=0 ---
+warning: Environment variable `ANDROID_NDK_HOME = "/home/runner/android-sdk/ndk/27.0.12077973"` doesn't match `ANDROID_NDK_ROOT = "/usr/local/lib/android/sdk/ndk/27.3.13750724"`
+
+=== 7) CAPS + артефакты ===
+ВОЗМОЖНОСТЬ                                  ЧЕМ ДОКАЗАНО                                               ЕСТЬ
+----------------------------------------------------------------------------------------------------------------
+вход user + 2FA                              auth.rs: is_authorized/request_login_code/sign_in/check_password да
+чтение: диалоги/участники/права/история      iter_dialogs / iter_participants / get_permissions(chat,user) / iter_messages да
+пакетное удаление со счётом сервера          delete_messages(&[i32]) -> usize                           да
+антицикличный признак                        Message::outgoing() / Update::NewMessage                   да
+оформление: название группы/канала           invoke(channels::EditTitle#566decd0 channel:InputChannel)  да
+оформление: фото                             invoke(channels::EditPhoto#f12e57c9 + inputChatUploadedPhoto#bdcdaec0) да
+оформление: описание базовой группы          invoke(messages::EditChatAbout#def60797 peer:InputPeer)    да
+оформление: описание СУПЕРГРУППЫ             channels::EditDescription                                  НЕТ — гейт не пройден
+FloodWait: ретраит mtsender (порог 60 с)     ConnectionParams::default() = AutoSleep{tries=1,threshold=60s}; клиентский retry_policy.rs — мёртвый файл да
+стикеры                                      invoke(messages::GetStickers / GetStickerSet + inputStickerSetShortName) да
+файлы                                        upload_file                                                да
+сессия без C-зависимостей                    MemorySession + default-features=false (нет rusqlite)      да
+----------------------------------------------------------------------------------------------------------------
+итого: 11 из 12 доступно; непройденных гейтов: 1
+target/aarch64-linux-android/release/libpurge.so: ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked, for Android 24, built by NDK r27 (12077973), stripped
+символов T: 0
+total 2511
+drwx------    2 root     root          3452 Nov 26 08:28 .
+drwx------    5 root     root          3452 Nov 26 08:28 ..
+-rw-------    1 root     root        307216 Nov 26 08:28 libpurge.so
+-rw-------    1 root     root       2250528 Nov 26 08:28 purge
+R18_DONE

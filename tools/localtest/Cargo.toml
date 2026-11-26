@@ -1,0 +1,15 @@
+[package]
+name = "localtest"
+version = "0.1.0"
+edition = "2021"
+
+# Этот проект нужен ТОЛЬКО чтобы тестировать боевой src/shape.rs локально:
+# grammers-tl-types требует Cargo ≥1.85 (edition 2024), а serde_json собирается
+# и на 1.83. Дублирования нет: боевой файл подключается по пути ниже, а не копируется.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "localtest"
+path = "main.rs"

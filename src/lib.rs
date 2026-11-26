@@ -15,6 +15,7 @@ pub mod auth;
 pub mod caps;
 pub mod engine;
 pub mod rate;
+pub mod shape;
 pub mod store;
 pub mod util;
 

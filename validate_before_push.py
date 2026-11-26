@@ -244,6 +244,46 @@ for f in sorted(os.listdir(f"{ROOT}/src")):
                   f"и нет `_ =>` → E0004 на сборке")
             ok = False
 
+# ---- локальный cargo-тест боевого JSON-слоя (без CI и без grammers) ----
+# serde_json собирается на cargo 1.83 (замерено 26.11), grammers — нет. Значит
+# форма JSON-ответов обязана проверяться здесь за ~25 с, а не шестью минутами CI.
+LT = f"{ROOT}/tools/localtest"
+if os.path.exists(f"{LT}/Cargo.toml"):
+    p = subprocess.run(["cargo", "test", "-q"], cwd=LT, capture_output=True, text=True)
+    if p.returncode != 0:
+        print("LOCALTEST ПЛОХО: cargo test в tools/localtest упал")
+        print((p.stdout or "")[-2500:], (p.stderr or "")[:800])
+        ok = False
+    else:
+        line = [l for l in (p.stdout or "").splitlines() if "test result" in l]
+        print(f"LOCALTEST OK: {line[-1].strip() if line else 'боевой src/shape.rs зелёный'}")
+    w = subprocess.run(["cargo", "build", "--release", "-q"], cwd=LT,
+                       capture_output=True, text=True)
+    nwarn = (w.stdout or "").count("warning:") + (w.stderr or "").count("warning:")
+    if nwarn:
+        print(f"LOCALTEST ПЛОХО: {nwarn} warning'ов в боевом src/shape.rs")
+        for l in ((w.stdout or "") + (w.stderr or "")).splitlines():
+            if l.startswith("warning"):
+                print("   ", l[:150])
+        ok = False
+    else:
+        print("LOCALTEST OK: release-сборка харнеса без warning'ов")
+    # Харнес обязан вызывать публичные формы shape.rs, иначе «never used» маскирует
+    # реальную мёртвую логику: allow(dead_code) на модуле оправдан ТОЛЬКО тем, что
+    # в lib.rs они pub-API. Проверим, что хотя бы часть действительно используется.
+    harness = open(f"{LT}/main.rs", encoding="utf-8").read()
+    for sym in ("no_null", "count_ru"):
+        if sym not in harness:
+            print(f"LOCALTEST ПЛОХО: харнес не вызывает {sym} — тесты не покрывают форму")
+            ok = False
+    if "#[allow(dead_code)]" not in harness:
+        print("LOCALTEST ПЛОХО: харнес без обоснованного allow(dead_code) — "
+              "warning'ы боевого файла вернутся")
+        ok = False
+else:
+    print("LOCALTEST ПЛОХО: нет tools/localtest/Cargo.toml — JSON-слой не тестируется локально")
+    ok = False
+
 # ---- doctest-ловушки в doc-комментариях (раунд 16: CI упал на моей же команде) ----
 # rustdoc гоняет КАЖДЫЙ кодовый блок в //! как doctest. Команда `rustc --test ...`,
 # набранная отступом в 4 пробела после пустой строки, ломает сборку тестов с

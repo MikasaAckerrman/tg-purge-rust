@@ -1,0 +1,24 @@
+=== 1) локальные проверки (все обязаны быть зелёными) ===
+ok: самопроверка: 15 из 15 прошли
+ok: скобки сбалансированы во всех src/*.rs
+ok: DOCTEST OK: ни одного Rust-блока без фенса в doc-комментариях
+ok: doctest-сканер краснеет на ловушке и зеленеет на легальном
+=== 2) localtest (боевой shape.rs, cargo) ===
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+warning'ов в localtest: 0
+=== 3) паритеты ===
+сценариев: 2029 | несовпадений: 0
+кейсов: 157 | несовпадений: 0
+=== 4) валидация пуша ===
+ok:
+CARGO OK: симметрия (7 объявлено, алиасов: 1, собственные имена: ['purge'])
+YAML OK: jobs = ['host', 'android']
+PURE OK: src/rate.rs — test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+PURE OK: src/util.rs — test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+LOCALTEST OK: test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+LOCALTEST OK: release-сборка харнеса без warning'ов
+DOCTEST OK: ни одного Rust-блока без фенса в doc-комментариях
+=== 5) Python-набор (эталон паритетов) ===
+Ran 129 tests in 6.133s
+OK
+=== 6) push ===
