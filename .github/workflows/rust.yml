@@ -79,8 +79,31 @@ jobs:
       - name: "размер артефактов"
         run: |
           set -o pipefail
-          ls -la target/release/purge target/release/libpurge.so | tee sizes.txt
-          du -sh target/release/libpurge.so
+          # ★ Раунд 22: ссылка на libpurge.so УБРАНА. Причина — провал CI раунда 21:
+          #   `ls: cannot access 'target/release/libpurge.so': No such file or directory`
+          #   (exit 2). Я сменил crate-type с cdylib на rlib в том же раунде, но
+          #   поправил только android-шаг «проверить артефакты» и НЕ прошёл список
+          #   всех шагов, ссылающихся на .so. Правило: меняя артефакт сборки, обязан
+          #   grep ВСЕ упоминания имени файла в workflow, а не только тот шаг,
+          #   который редактируешь.
+          ls -la target/release/purge | tee sizes.txt
+          du -sh target/release/purge
+          # cdylib не должен вернуться молча: rlib + bin — это и есть путь APK
+          if [ -e target/release/libpurge.so ]; then
+            echo "::error::libpurge.so снова собирается — путь 26.11 (бинарь как процесс) этого не требует, а два артефакта путают CI и APK"
+            exit 1
+          fi
+          # бинарь обязан быть исполняемым и не слишком тяжёлым для files_dir
+          if [ ! -x target/release/purge ]; then
+            echo "::error::target/release/purge не исполняемый — APK не сможет его поднять как процесс"
+            exit 1
+          fi
+          SZ=$(stat -c%s target/release/purge)
+          echo "размер бинаря host: $SZ байт"
+          if [ "$SZ" -lt 500000 ]; then
+            echo "::error::бинярь слишком мал ($SZ байт) — похоже, собрался не тот артефакт"
+            exit 1
+          fi
 
       # ★ Отчёт загружается ВСЕГДА и ПРИ ПРОВАЛЕ (раунд 14): шаги по умолчанию
       #   пропускаются после предыдущего падения (`if: success()`), поэтому при
@@ -217,8 +240,27 @@ jobs:
           #   ⇒ процесс из files_dir поднимется без root и без JNI.
           readelf -h target/aarch64-linux-android/release/purge > hdr.txt 2>&1 || true
           grep -E "Class:|Machine:|Type:" hdr.txt | tee -a android_file.txt || true
-          if ! grep -q "Type:.*EXEC" hdr.txt; then
-            echo "::error::бинарь не ET_EXEC — как процесс из APK не запустится"
+          # ★ Раунд 22: проверка Type исправлена после провала CI раунда 21.
+          #   Я требовал `Type: EXEC`, но aarch64-release собирается как PIE:
+          #     file → «ELF 64-bit LSB pie executable, ARM aarch64, ... interpreter
+          #             /system/bin/linker64, for Android 24, stripped»
+          #     readelf → «Type: DYN (Position-Independent Executable file)»
+          #   То есть мой гейт отклонял РАБОЧИЙ артефакт: PIE — штатная форма
+          #   исполняемого файла на Android (все нативные executable в APK — PIE),
+          #   и он запускается как процесс точно так же. Гейт, ломающий то, что он
+          #   охраняет, хуже отсутствия гейта: он учит игнорировать красные флаги.
+          #   Правильный критерий «запустится как процесс»: file говорит «executable»
+          #   (а не «shared object»), есть интерпретатор linker64, Machine=AArch64.
+          if ! grep -qE "Type:.*(EXEC|DYN)" hdr.txt; then
+            echo "::error::неизвестный Type в readelf — бинарь не ни EXEC, ни PIE"
+            exit 1
+          fi
+          if grep -q "shared object" android_file.txt; then
+            echo "::error::артефакт — shared object (.so), а не исполняемый файл: как процесс из APK не запустится"
+            exit 1
+          fi
+          if ! grep -qiE "pie executable|executable" android_file.txt; then
+            echo "::error::file не называет артефакт исполняемым"
             exit 1
           fi
           if ! grep -q "AArch64" hdr.txt; then

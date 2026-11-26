@@ -16,7 +16,12 @@ import yaml
 
 import braces2
 
-ROOT = "/var/minis/shared/rustspike"
+ROOT = os.environ.get("TGPURGE_ROOT") or os.path.dirname(os.path.abspath(__file__))
+# ★ Раунд 22: раньше здесь был хардкод "/var/minis/shared/rustspike", и красный вход
+#   на КОПИИ дерева (восстановленные ошибки CI-шагов) НЕ КРАСНЕЛ: валидатор читал
+#   боевой workflow и докладывал «ГОТОВО К ПУШУ» о файле, которого он не проверял.
+#   Тот же класс, что BA-13 в тестах (test_dispatch читал engine.py по абсолютному
+#   пути → 0 падений при применённом откате): неатрибуируемая проверка = декорация.
 # Путь workflow можно переопределить: так проверяем, что валидатор КРАСНЕЕТ на
 # намеренно сломанном файле (валидатор, который не умеет падеть, — бумажка).
 WF = sys.argv[1] if len(sys.argv) > 1 else f"{ROOT}/.github/workflows/rust.yml"
@@ -337,6 +342,78 @@ if os.path.isdir(PY_UI) and os.path.isdir(RS_UI):
 elif not os.path.isdir(RS_UI):
     print("UI ПЛОХО: нет assets/ui — путь «APK запускает бинарь» некомплектен")
     ok = False
+
+# ---- артефакты CI против Cargo.toml (раунд 22) ----
+# Поймано провалом CI раунда 21: я сменил crate-type cdylib→rlib, поправил только
+# один шаг и оставил `ls target/release/libpurge.so` в шаге «размер артефактов»
+# (host) → `ls: cannot access ... ` → exit 2. Правило: меняя ФОРМУ артефакта,
+# обязан пройти ВСЕ упоминания имени в workflow, а не только редактируемый шаг.
+wf = open(f"{ROOT}/.github/workflows/rust.yml", encoding="utf-8").read()
+
+
+def yaml_code(src):
+    """Workflow БЕЗ YAML-комментариев.
+
+    Нужно, потому что собственные комментарии раунда 22 («…pie executable…», «…ls
+    не находит libpurge.so…») удовлетворяли предикатам лучше, чем код: валидатор
+    докладывал «CI OK» о файле, где ошибка стояла в команде, просто потому что то же
+    слово было в пояснении. Тот же класс, что `strip_js_comments` в UI-тестах
+    (26.11: ассерт краснел на прозе, а не на коде).
+    """
+    out = []
+    for line in src.splitlines():
+        s = line.lstrip()
+        out.append("" if s.startswith("#") else line)
+    return "\n".join(out)
+
+
+# ★ braces2.blanks здесь НЕ применяется: он затирает содержимое кавычек, а нужные
+#   нам предикаты живут внутри кавычек (`grep -qE "Type:.*(EXEC|DYN)"`). Комментарии
+#   YAML уже убраны yaml_code — именно они были причиной ложного «CI OK».
+wf_code = yaml_code(wf)
+lib_names = []
+if "cdylib" not in str(man.get("lib", {}).get("crate-type", [])):
+    lib_names.append(f"lib{man.get('lib', {}).get('name', man['package']['name'])}.so")
+for bad in lib_names:
+    # ищем только в командах run (комментарии YAML имеют право упоминать имя)
+    hits = [l.strip() for l in wf_code.splitlines()
+            if bad in l and not l.strip().startswith("#") and "echo" not in l
+            and "if [" not in l and "::error" not in l]
+    if hits:
+        print(f"CI ПЛОХО: workflow ссылается на {bad}, которого не собирается (crate-type без cdylib):")
+        for h in hits[:4]:
+            print("   ", h[:110])
+        ok = False
+    else:
+        print(f"CI OK: {bad} не требуется ни в одной команде (cdylib убран осознанно)")
+
+# ---- гейт исполнимости обязан принимать PIE (раунд 22) ----
+# Раунд 21 требовал `Type:.*EXEC`, а aarch64-release — PIE («DYN (Position-Independent
+# Executable file)»): гейт отклонял РАБОЧИЙ артефакт. Гейт, ломающий охраняемое,
+# хуже отсутствия гейта — он приучает игнорировать красные флаги.
+# ★ Предикат смотрит СТРОКУ ПРОВЕРКИ, а не весь файл: первая версия искала
+#   «pie executable» по всему workflow и оставалась зелёной на копии с возвращённым
+#   `grep -q "Type:.*EXEC"`, потому что это слово жило в соседней (легальной)
+#   проверке `file`. Вторая версия ловила любую строку со словом Type и краснела на
+#   БОЕВОМ файле: `grep -E "Class:|Machine:|Type:" hdr.txt | tee -a …` — это печать
+#   readelf, а не условие. Фильтр: только `if … grep … hdr.txt`.
+type_lines = [l.strip() for l in wf_code.splitlines()
+              if "Type:" in l and "grep" in l and "hdr.txt" in l
+              and l.strip().startswith("if")]
+if not type_lines:
+    print("CI ПЛОХО: в workflow нет проверки Type у readelf — артефакт мог перестать быть исполняемым незамеченным")
+    ok = False
+else:
+    bad = [l for l in type_lines if "DYN" not in l]
+    for l in type_lines:
+        print(f"  проверка Type: {l[:100]}")
+    if bad:
+        print(f"CI ПЛОХО: {len(bad)} из {len(type_lines)} проверок Type требуют только EXEC — aarch64-бинарь PIE и провалится:")
+        for l in bad:
+            print("   ", l[:110])
+        ok = False
+    else:
+        print(f"CI OK: все {len(type_lines)} проверок Type принимают PIE (EXEC|DYN)")
 
 # ---- doctest-ловушки в doc-комментариях (раунд 16: CI упал на моей же команде) ----
 # rustdoc гоняет КАЖДЫЙ кодовый блок в //! как doctest. Команда `rustc --test ...`,
