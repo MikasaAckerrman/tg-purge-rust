@@ -22,3 +22,97 @@ DOCTEST OK: ни одного Rust-блока без фенса в doc-комм�
 Ran 129 tests in 6.133s
 OK
 === 6) push ===
+push exit=0 HEAD=bb9ad3f
+=== 7) ждём CI ===
+run_id=45758054465
+=== 8) вердикт ===
+run_id=45758054465
+state: completed / success
+
+JOB host: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 сборка релиза (lib cdylib + bin)
+   OK   6 юнит-тесты (dev-профиль: release имеет panic=abort)
+   OK   7 список возможностей, доказанных компилятором
+   OK   8 размер артефактов
+   OK   9 сохранить отчёт
+   OK  18 Post Run actions/checkout@v4
+   OK  19 Complete job
+
+JOB android: completed / success
+   OK   1 Set up job
+   OK   2 Run actions/checkout@v4
+   OK   3 Run dtolnay/rust-toolchain@stable
+   OK   4 версия тулчейна
+   OK   5 Android cmdline-tools (без сторонних экшенов)
+   OK   6 NDK r27
+   OK   7 cargo-ndk
+   OK   8 сборка под Android arm64-v8a
+   OK   9 проверить артефакты
+   OK  10 Run actions/upload-artifact@v4
+   OK  11 сохранить отчёт android
+   OK  22 Post Run actions/checkout@v4
+   OK  23 Complete job
+
+артефакты: 3
+  purge-android-arm64: 1207852 Б → /var/minis/shared/rustspike/logs_pull/purge-android-arm64
+  android-report: 5722 Б → /var/minis/shared/rustspike/logs_pull/android-report
+
+--- android.log: 211 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Compiling grammers-mtproto v0.12.0
+       Compiling grammers-session v0.12.0
+       Compiling grammers-mtsender v0.12.0
+       Compiling grammers-client v0.12.0
+       Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+        Finished `release` profile [optimized] target(s) in 1m 10s
+
+--- ndk.log: 93 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+    [=====================                  ] 54% Unzipping... android-ndk-r27/sourc
+    [=====================                  ] 54% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/simpl
+    [=====================                  ] 55% Unzipping... android-ndk-r27/CHANG
+    [=======================================] 100% Unzipping... android-ndk-r27/CHAN
+    
+
+--- ndkinst.log: 210 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+        Finished `release` profile [optimized] target(s) in 35.00s
+      Installing /home/runner/.cargo/bin/cargo-ndk
+      Installing /home/runner/.cargo/bin/cargo-ndk-env
+      Installing /home/runner/.cargo/bin/cargo-ndk-runner
+      Installing /home/runner/.cargo/bin/cargo-ndk-test
+       Installed package `cargo-ndk v4.1.2` (executables `cargo-ndk`, `cargo-ndk-env`, `cargo-ndk-runner`, `cargo-ndk-test`)
+  host-report: 6189 Б → /var/minis/shared/rustspike/logs_pull/host-report
+
+--- build.log: 92 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Compiling grammers-session v0.12.0
+       Compiling grammers-mtproto v0.12.0
+       Compiling grammers-mtsender v0.12.0
+       Compiling grammers-client v0.12.0
+       Compiling purge v0.1.0 (/home/runner/work/tg-purge-rust/tg-purge-rust)
+        Finished `release` profile [optimized] target(s) in 50.52s
+
+--- test.log: 179 строк, 0 ошибок
+   (ошибок нет) последние 6 строк:
+       Doc-tests purge
+    
+    running 0 tests
+    
+    test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+    
+
+=== 9) warning/error по логам ===
+--- build.log.clean: warning=0 error=0 ---
+--- test.log.clean: warning=0 error=0 ---
+--- android.log.clean: warning=1 error=0 ---
+warning: Environment variable `ANDROID_NDK_HOME = "/home/runner/android-sdk/ndk/27.0.12077973"` doesn't match `ANDROID_NDK_ROOT = "/usr/local/lib/android/sdk/ndk/27.3.13750724"`
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+R19_DONE

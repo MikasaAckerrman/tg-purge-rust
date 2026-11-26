@@ -153,13 +153,19 @@ jobs:
           echo "=== что реально установлено в \$ANDROID_HOME/ndk ==="
           ls -1 "$ANDROID_HOME/ndk" > ndkdirs.txt 2>&1 || true
           cat ndkdirs.txt
-          NDK="$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | head -1)"
+          NDK="$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)"
           if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
             echo "::error::каталог NDK не найден после установки"
             sed -n '1,40p' ndk.log 2>/dev/null || true
             exit 1
           fi
+          # Раунд 19: единственный оставшийся warning CI — cargo-ndk жалуется, что
+          # ANDROID_NDK_HOME ≠ ANDROID_NDK_ROOT (runner держит свой 27.3 в /usr/local/lib).
+          # Выставляем ОБЕ переменные на один и тот же каталог: warning исчезает,
+          # а сборка остаётся воспроизводимой (каталог берётся по факту установки).
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+          export ANDROID_NDK_ROOT="$NDK"
           BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           ls -1 "$BIN" > bins.txt 2>&1 || true
           echo "=== бинарей в NDK: $(wc -l < bins.txt) ==="
